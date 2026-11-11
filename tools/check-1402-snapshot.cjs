@@ -33,5 +33,11 @@ if (!file || !kbase) {
     })),
   }, null, 2));
 
-  process.exitCode = result.state === "all-stock" || result.state === "all-final" ? 0 : 2;
+    if (result.state === "all-stock") {
+    process.exitCode = 0;
+  } else if (result.state === "all-final") {
+    process.exitCode = 3;
+  } else {
+    process.exitCode = 2;
+  }
 }
