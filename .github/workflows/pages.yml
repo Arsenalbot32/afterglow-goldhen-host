@@ -29,6 +29,7 @@ jobs:
           node tests/launch-gate-selftest.cjs
           node tests/preflight-1402-selftest.cjs
           node tests/guarded-bootstrap-1402-selftest.cjs
+          node tests/teardown-verify-1402-selftest.cjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
