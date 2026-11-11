@@ -21,7 +21,7 @@ excluded.
 The landing page navigates to:
 
 ```text
-launch.html?v=gh1402panic1&log=1&afterglow=run&mode=goldhen
+launch.html?v=gh1402panic2&log=1&afterglow=run&mode=goldhen
 ```
 
 Do not open `launch.html` directly. The exploit checks that it was reached
@@ -40,11 +40,21 @@ freeze or crash the console; do not run it while anything is unsaved.
 
 The 14.02 route is not an official GoldHEN release. It is currently fail-closed
 after a real 14.02 console test produced a kernel panic on 2026-11-11.
-It repairs the mismatched loader/kpayload tables, compressed-image layout, and
-missed process-offset dispatch in the supplied archive. ShellCore, ShellUI and
-RemotePlay patch installers remain disabled, and the unsafe 14.00 patchset is
-never run on 14.02. Expect core services such as FTP/BinLoader at most until a
-console test confirms the remaining path.
+Static analysis after that test found two concrete corruption paths. The web
+stage tried to relocate 14.00 patches using one-byte guesses and could not find
+the required 14.02 `+0x220` loader sites. The reconstructed GoldHEN table also
+placed three return-one stubs `0x80` bytes before their validated 14.02 function
+entries; one target landed inside an instruction.
+
+The source now records all fifteen exact 14.02 eight-byte patch windows and
+refuses mismatches instead of scanning or guessing. A separate local candidate
+also corrects the three GoldHEN table entries, but it is deliberately not
+published: the earlier kernel bootstrap and the remaining payload writes still
+need complete preimage validation. Do not retry 14.02 from this host until that
+work is complete. The 14.02 table is independently corroborated by
+[ArabPixel/WebKitty commit 8e256c3](https://github.com/ArabPixel/WebKitty/commit/8e256c322b645984c56d4d90e253d4c7cf83e9e1)
+and by the supplied kernel artifact at fourteen of fifteen sites; bcopy was
+already patched in that artifact, so its original first byte remains inferred.
 
 The runtime verifies every firmware-fixed binary before use:
 
