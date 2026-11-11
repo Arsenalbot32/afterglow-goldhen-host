@@ -1,7 +1,8 @@
 # GoldHEN host for PS4 14.00 / 14.02
 
-Static GitHub Pages host for the supplied afterglow browser exploit, fixed to
-the normal **GoldHEN** loader.
+Static GitHub Pages host for the supplied afterglow browser exploit. Firmware
+14.00 uses the official **GoldHEN** binary and matched patchset. Firmware 14.02
+uses a reconstructed, hash-pinned experimental core candidate.
 
 Hosted URL after Pages finishes deploying:
 
@@ -19,7 +20,7 @@ excluded.
 The landing page navigates to:
 
 ```text
-launch.html?v=1402s&log=1&afterglow=run&mode=goldhen
+launch.html?v=gh1402c1&log=1&afterglow=run&mode=goldhen
 ```
 
 Do not open `launch.html` directly. The exploit checks that it was reached
@@ -35,6 +36,22 @@ imports so the console cannot reuse an older GitHub Pages response.
 
 The kernel patch lasts until the console reboots. A failed exploit run can
 freeze or crash the console; do not run it while anything is unsaved.
+
+The 14.02 route is not an official GoldHEN release and is not hardware-proven.
+It repairs the mismatched loader/kpayload tables, compressed-image layout, and
+missed process-offset dispatch in the supplied archive. ShellCore, ShellUI and
+RemotePlay patch installers remain disabled, and the unsafe 14.00 patchset is
+never run on 14.02. Expect core services such as FTP/BinLoader at most until a
+console test confirms the remaining path.
+
+The runtime verifies every firmware-fixed binary before use:
+
+```text
+goldhen.bin (official 14.00)       39452f5e1c305ac9efcb4745eef7958b4db8c6d85299529f08700970b009ea4d
+patchset.bin (14.00 only)         615f275b96831cc04173757db39e93f0d27b52888976af2a6444604aa8ac5dbf
+goldhen-1402-experimental.bin     23fa75217949cd1be4ba0531e726c05f4ca0a2e47ed9eedb598e23da4eeacca9
+supplied 14.02 kpayload source    5c643b05a52e06cc6a32a73b1780950a1ca90930e167f0a3eff9a56d54908c28
+```
 
 Licensed under the GNU Affero General Public License v3.0 or later. See
 `LICENSE`.
