@@ -2,7 +2,8 @@
 
 Static GitHub Pages host for the supplied afterglow browser exploit. Firmware
 14.00 uses the official **GoldHEN** binary and matched patchset. Firmware 14.02
-uses a reconstructed, hash-pinned experimental core candidate.
+has been disabled after the reconstructed candidate caused a hardware kernel
+panic during its first console test.
 
 Hosted URL after Pages finishes deploying:
 
@@ -20,7 +21,7 @@ excluded.
 The landing page navigates to:
 
 ```text
-launch.html?v=gh1402c1&log=1&afterglow=run&mode=goldhen
+launch.html?v=gh1402panic1&log=1&afterglow=run&mode=goldhen
 ```
 
 Do not open `launch.html` directly. The exploit checks that it was reached
@@ -37,7 +38,8 @@ imports so the console cannot reuse an older GitHub Pages response.
 The kernel patch lasts until the console reboots. A failed exploit run can
 freeze or crash the console; do not run it while anything is unsaved.
 
-The 14.02 route is not an official GoldHEN release and is not hardware-proven.
+The 14.02 route is not an official GoldHEN release. It is currently fail-closed
+after a real 14.02 console test produced a kernel panic on 2026-11-11.
 It repairs the mismatched loader/kpayload tables, compressed-image layout, and
 missed process-offset dispatch in the supplied archive. ShellCore, ShellUI and
 RemotePlay patch installers remain disabled, and the unsafe 14.00 patchset is
