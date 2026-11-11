@@ -125,10 +125,10 @@
     crashReport.hidden = false;
     crashSummary.textContent = diagnostics.describe(record);
     if (diagnostics.isAcknowledged(record)) {
-      acknowledge.style.display = "none";
-      return false;
-    }
-
+  crashReport.hidden = true;
+  acknowledge.style.display = "none";
+  return false;
+}
     if (start) start.style.display = "none";
     if (count) count.textContent = "Auto-start paused until the previous run is acknowledged.";
     acknowledge.addEventListener("click", function () {
