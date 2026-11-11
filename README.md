@@ -9,14 +9,19 @@ Hosted URL after Pages finishes deploying:
 
 <https://ktmwilson23.github.io/afterglow-goldhen-host/>
 
-Open that address in the PS4 browser. GoldHEN starts after a five-second
-countdown, or immediately when the start button is selected.
+Open that address in the PS4 browser. On 14.00, GoldHEN starts after a
+five-second countdown or when the start button is selected. On 14.02, the
+launch is disabled after a hardware kernel panic.
+
+The separate [14.02 storage diagnostic](https://ktmwilson23.github.io/afterglow-goldhen-host/d1/)
+contains no exploit or payload. It confirms that a diagnostic marker survives
+a browser reload; passing it does not establish kernel or GoldHEN support.
 
 ## Published runtime
 
-Only the files needed by the standard GoldHEN route are deployed from
-`site/`. The HEN payload, ISO, and `kpstep` diagnostic routes are deliberately
-excluded.
+GitHub Pages deploys `site/`. The 14.02 experimental binary is present for
+provenance but cannot be launched by the 14.02 page. The HEN payload, ISO,
+and `kpstep` diagnostic routes are excluded.
 
 The landing page navigates to:
 
@@ -61,13 +66,18 @@ only at the two `sys_mmap` protection immediates (`+0x400`). It remains blocked
 until an all-stock/all-final preflight protects every bootstrap write and the
 unused syscall slot.
 
+The offline investigation and remaining launch gates are recorded in
+[the 14.02 port status](docs/14.02-port-status.md). The offline preflight
+classifier and guarded bootstrap prototype are research tools; neither is
+connected to the PS4 launch path.
+
 The runtime verifies every firmware-fixed binary before use:
 
 ```text
 goldhen.bin (official 14.00)       39452f5e1c305ac9efcb4745eef7958b4db8c6d85299529f08700970b009ea4d
 patchset.bin (14.00 only)         615f275b96831cc04173757db39e93f0d27b52888976af2a6444604aa8ac5dbf
 goldhen-1402-experimental.bin     23fa75217949cd1be4ba0531e726c05f4ca0a2e47ed9eedb598e23da4eeacca9
-supplied 14.02 kpayload source    5c643b05a52e06cc6a32a73b1780950a1ca90930e167f0a3eff9a56d54908c28
+supplied 14.02 compiled kpayload  5c643b05a52e06cc6a32a73b1780950a1ca90930e167f0a3eff9a56d54908c28
 ```
 
 Licensed under the GNU Affero General Public License v3.0 or later. See

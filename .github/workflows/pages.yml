@@ -24,6 +24,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Check launch gate and offline 14.02 research
+        run: |
+          node tests/launch-gate-selftest.cjs
+          node tests/preflight-1402-selftest.cjs
+          node tests/guarded-bootstrap-1402-selftest.cjs
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
