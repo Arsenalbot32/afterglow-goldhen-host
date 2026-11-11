@@ -21,7 +21,7 @@ excluded.
 The landing page navigates to:
 
 ```text
-launch.html?v=gh1402panic2&log=1&afterglow=run&mode=goldhen
+launch.html?v=gh1402panic3&log=1&afterglow=run&mode=goldhen
 ```
 
 Do not open `launch.html` directly. The exploit checks that it was reached
@@ -55,6 +55,11 @@ work is complete. The 14.02 table is independently corroborated by
 [ArabPixel/WebKitty commit 8e256c3](https://github.com/ArabPixel/WebKitty/commit/8e256c322b645984c56d4d90e253d4c7cf83e9e1)
 and by the supplied kernel artifact at fourteen of fifteen sites; bcopy was
 already patched in that artifact, so its original first byte remains inferred.
+
+The exact static 14.02 bootstrap is also recorded now; it differs from 14.00
+only at the two `sys_mmap` protection immediates (`+0x400`). It remains blocked
+until an all-stock/all-final preflight protects every bootstrap write and the
+unused syscall slot.
 
 The runtime verifies every firmware-fixed binary before use:
 
