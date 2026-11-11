@@ -137,6 +137,8 @@
           "Could not save acknowledgement (" + diagnostics.error() + "). Auto-start remains paused.";
         return;
       }
+      crashReport.hidden = true;
+      acknowledge.style.display = "none";
       acknowledge.disabled = true;
       acknowledge.textContent = "Previous run acknowledged";
       remaining = 5;
