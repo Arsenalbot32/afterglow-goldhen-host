@@ -47,16 +47,19 @@
     return null;
   }
 
-  /* Effective groom level for the next run. mem=0 is the heaviest groom
-     and is known to trigger out-of-memory kills and random crashes on the
-     14.02 experimental route, so it is never run there: explicit or not,
-     14.02 falls back to the light default (mem=2). 14.00 is unchanged and
-     keeps honouring an explicit mem=0. The crash ladder below still stores
-     its own levels. */
+  /* Effective groom level for the next run. An explicit mem=0 (the
+     heaviest groom, ~130 MB) is honoured on 14.02 again: the November 11
+     hardware run that reached the GoldHEN payload used exactly that
+     groom, and the 4.4M/8.6M addrof draws only ever appeared under the
+     light profiles. If mem=0 runs the browser out of memory, the crash
+     ladder below steps down to mem=2 automatically, so the downside is
+     one recovered cycle, not a dead end. Without an explicit choice,
+     14.02 still starts on the light default (mem=2). */
   function effectiveMemLevel() {
     var raw = storedMem();
     var level = raw ? raw.level : 0;
-    if (level === 0 && detectedFirmware() === "14.02") level = 2;
+    if ((!raw || !raw.explicit) && level === 0 &&
+        detectedFirmware() === "14.02") level = 2;
     /* An automatic retry after a live-page give-up rotates the groom
        profile: the addrof coverage draw is a function of the groom
        geometry, and a console whose draw is pathologically stable under
@@ -86,7 +89,7 @@
     var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem18&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem19&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -149,9 +152,9 @@
             "profile (the addrof draw depends on the groom geometry).";
         } else if (explicit && raw.level === 0 && detectedFirmware() === "14.02") {
           note.textContent =
-            "mem=0 is the heaviest groom and crashes the browser on 14.02: " +
-            "the next run will use mem=2 automatically. Cycle back to auto " +
-            "for the defaults.";
+            "mem=0 is the heaviest groom (~130 MB) -- the one the November 11 " +
+            "run that reached the payload used. If the browser runs out of " +
+            "memory, the site steps down to mem=2 automatically and relaunches.";
         } else {
           note.textContent = explicit
             ? "Next run uses ?mem=" + level + ". Cycle back to auto for the defaults."
