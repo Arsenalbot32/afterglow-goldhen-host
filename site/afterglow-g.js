@@ -2476,11 +2476,17 @@ async function attempt(ctx, opts) {
     }
     if (bootRc !== 0 && bootRc !== 1) {
       /* -1 or anything else: the ioctl did not reach the bootstrap this
-         time (the [5] hook lost its race).  The kernel is untouched and the
-         rwx probe below still decides; flag a retry so a lost race costs
-         one more attempt instead of the whole run. */
-      say("    the bootstrap did not report (hook race lost) -- kernel is fine, retrying");
-      STATE.retry = true;
+         time (the [5] hook lost its race).  The kernel is untouched and
+         the rwx probe below still decides.  The run ends here instead of
+         retrying in-page: a second attempt re-sprays onto this attempt's
+         still-live device handles, and on hardware (2026-11-12) that
+         froze the whole browser right after "attempt 1 fell short" --
+         the WebProcess hung and only a restart recovered it.  Quitting
+         and relaunching the browser rolls both lotteries -- primitive
+         and hook race -- with a fresh process, which is the recovery
+         this route already documents and the landing page drives. */
+      say("    the bootstrap did not report (hook race lost) -- kernel is fine");
+      say("    ending the run -- quit and relaunch the browser to roll the race again");
     }
     /* 0 PATCHED or 1 ALREADY_FINAL: the kernel is exactly in the state
        the rest of the chain expects; carry on. */
