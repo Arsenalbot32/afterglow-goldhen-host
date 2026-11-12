@@ -2040,8 +2040,8 @@ async function attempt(ctx, opts) {
   if (ctx.firmware === "14.02") {
     say("afterglow -- firmware 14.02 EXPERIMENTAL: kernel chain proven on a retail dump,");
     say("    guarded bootstrap + live sysent readout enabled; GoldHEN payload itself unverified on hardware");
-    say("    on a lost race or refusal, press Circle and the start page retries in this browser session");
-    say("    closing the browser after a failed run can freeze it -- then power-cycle the console");
+    say("    on a lost race or refusal, press Circle, then close and reopen the browser");
+    say("    if the browser or the console freezes, power-cycle the console before the next run");
   } else if (ctx.firmware !== "14.00") {
     say("afterglow -- firmware " + (ctx.firmware || "unknown")
         + " is not enabled in this release; stopping before the kernel stage");

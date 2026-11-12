@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402mem10";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem10";
-import { int64 } from "./int64.js?v=gh1402mem10";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem10";
+import { establishPrimitive } from "./core.js?v=gh1402mem11";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem11";
+import { int64 } from "./int64.js?v=gh1402mem11";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem11";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -1078,7 +1078,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402mem10");
+        const ag = await import("./afterglow-g.js?v=gh1402mem11");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,
@@ -1124,14 +1124,15 @@ let allDone = false,
         } catch (e) {}
       } catch (agError) {
         mark("AG-FAIL", agError && agError.message ? agError.message : String(agError));
-        /* The failed run leaves live kernel-side device handles behind.
-           Closing the browser is what can hang on them, so the retry runs
-           in this same browser session: press Circle to return to the
-           start page and the countdown relaunches. A frozen browser is
-           recovered by a console power cycle. */
+        /* The failed run leaves live kernel-side device handles and
+           deferred destroys behind. An in-session retry can hang the
+           kernel on that residue mid-run, and closing the browser over
+           the handles can hang the process exit -- so the recovery is a
+           fresh browser process, with a console power cycle whenever
+           anything freezes. */
         mark(
           "NEXT",
-          "press Circle to return to the start page -- it retries in this browser session; do not close the browser",
+          "close and reopen the browser to try again; if the browser or the console freezes, power-cycle the console (off 30 seconds)",
         );
         allDone = true;
         markAttemptClear();

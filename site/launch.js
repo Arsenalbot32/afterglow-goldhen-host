@@ -66,7 +66,7 @@
     var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem10&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem11&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -157,13 +157,17 @@
 
     if (params.get("afterglow") === "failed") {
       /* The previous run armed the kernel stage and did not finish, so it
-         left live kernel-side device handles behind. Closing the browser
-         is exactly what can hang on them (a frozen browser is recovered
-         by a console power cycle), so the retry runs in THIS browser
-         session: the countdown below relaunches with the failed run's
-         handles left inert. */
-      preNotice =
-        "Previous run lost the hook race -- retrying in this browser session. ";
+         left live kernel-side handles and deferred device destroys
+         behind. Neither an in-session retry (the kernel can hang on the
+         residue mid-run) nor closing the browser over them is safe, so
+         the page stops: the recovery is a fresh browser process, and a
+         console power cycle whenever anything freezes. */
+      stop(
+        "GoldHEN did not start. Close and reopen the browser to try again. " +
+          "If the browser or the console freezes, power-cycle the console " +
+          "(off 30 seconds) and try again.",
+      );
+      return;
     }
 
     if (params.get("afterglow") === "probe") {
@@ -182,8 +186,9 @@
       enableStorageTest(firmware);
       if (count) count.textContent =
         "EXPERIMENTAL 14.02 route: kernel chain proven on a retail dump, " +
-        "GoldHEN payload unverified on hardware. After a failed run the " +
-        "page retries in this browser session.";
+        "GoldHEN payload unverified on hardware. After a failed run, " +
+        "close and reopen the browser; if anything freezes, power-cycle " +
+        "the console.";
     }
 
     if (start) {
@@ -228,8 +233,15 @@
       acknowledge.style.display = "none";
       acknowledge.disabled = true;
       acknowledge.textContent = "Previous run acknowledged";
-      remaining = 5;
-      beginCountdown();
+      /* An in-session retry can hang the kernel on the previous run's
+         residue mid-run, and closing the browser over the live handles
+         can hang the process exit -- so the ack explains the recovery
+         instead of retrying here. */
+      stop(
+        "Close and reopen the browser, then reopen this page to try again. " +
+          "If the browser or the console freezes, power-cycle the console " +
+          "(off 30 seconds) and try again.",
+      );
     });
     return true;
   }
