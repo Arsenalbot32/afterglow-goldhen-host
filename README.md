@@ -1,84 +1,86 @@
-# GoldHEN host for PS4 14.00 / 14.02
+# Afterglow GoldHEN Host — PS4
 
-Static GitHub Pages host for the supplied afterglow browser exploit. Firmware
-14.00 uses the official **GoldHEN** binary and matched patchset. Firmware 14.02
-has been disabled after the reconstructed candidate caused a hardware kernel
-panic during its first console test.
+Static GitHub Pages host and offline research project for PlayStation 4 firmware 14.00 and 14.02.
 
-Hosted URL after Pages finishes deploying:
+Published site:
+https://arsenalbot32.github.io/afterglow-goldhen-host/
 
-<https://ktmwilson23.github.io/afterglow-goldhen-host/>
+## Project overview
 
-Open that address in the PS4 browser. On 14.00, GoldHEN starts after a
-five-second countdown or when the start button is selected. On 14.02, the
-launch is disabled after a hardware kernel panic.
+This repository contains the Afterglow browser host, firmware-specific research files, and offline diagnostic utilities.
 
-The separate [14.02 storage diagnostic](https://ktmwilson23.github.io/afterglow-goldhen-host/d1/)
-contains no exploit or payload. It confirms that a diagnostic marker survives
-a browser reload; passing it does not establish kernel or GoldHEN support.
+The project distinguishes between the existing 14.00 implementation and the experimental 14.02 research work.
 
-## Published runtime
+**Firmware 14.02 compatibility has not been established.**
 
-GitHub Pages deploys `site/`. The 14.02 experimental binary is present for
-provenance but cannot be launched by the 14.02 page. The HEN payload, ISO,
-and `kpstep` diagnostic routes are excluded.
+## Current status
 
-The landing page navigates to:
+| Firmware | Status |
+|---|---|
+| 14.00 | Existing GoldHEN implementation |
+| 14.02 | Experimental, disabled and unverified |
 
-```text
-launch.html?v=gh1402panic3&log=1&afterglow=run&mode=goldhen
-```
+The 14.02 launch path remains disabled.
 
-Do not open `launch.html` directly. The exploit checks that it was reached
-from `index.html` on the same origin before arming.
+A reconstructed 14.02 candidate caused a hardware kernel panic during testing on November 11, 2026. No subsequent work has established a reliable or safe 14.02 launch.
 
-## Updating
+The 14.02 experimental artifacts must not be considered console-ready.
 
-Pushing to `main` deploys `site/` through GitHub Actions. If JavaScript is
-changed later, also change the `?v=` values used by the HTML and module
-imports so the console cannot reuse an older GitHub Pages response.
+## Diagnostic tools
 
-## Safety
+The repository includes offline utilities for research and local validation:
 
-The kernel patch lasts until the console reboots. A failed exploit run can
-freeze or crash the console; do not run it while anything is unsaved.
+- `site/preflight-1402.js` — classifies supplied byte snapshots.
+- `tools/check-1402-snapshot.cjs` — checks local snapshot data.
+- `tools/build-guarded-bootstrap-1402.cjs` — generates an offline prototype.
+- `site/teardown-verify-1402.js` — checks supplied structural snapshots.
+- `tests/` — contains local self-tests.
 
-The 14.02 route is not an official GoldHEN release. It is currently fail-closed
-after a real 14.02 console test produced a kernel panic on 2026-11-11.
-Static analysis after that test found two concrete corruption paths. The web
-stage tried to relocate 14.00 patches using one-byte guesses and could not find
-the required 14.02 `+0x220` loader sites. The reconstructed GoldHEN table also
-placed three return-one stubs `0x80` bytes before their validated 14.02 function
-entries; one target landed inside an instruction.
+These utilities do not establish firmware compatibility, authenticate a complete kernel image, or certify hardware safety.
 
-The source now records all fifteen exact 14.02 eight-byte patch windows and
-refuses mismatches instead of scanning or guessing. A separate local candidate
-also corrects the three GoldHEN table entries, but it is deliberately not
-published: the earlier kernel bootstrap and the remaining payload writes still
-need complete preimage validation. Do not retry 14.02 from this host until that
-work is complete. The 14.02 table is independently corroborated by
-[ArabPixel/WebKitty commit 8e256c3](https://github.com/ArabPixel/WebKitty/commit/8e256c322b645984c56d4d90e253d4c7cf83e9e1)
-and by the supplied kernel artifact at fourteen of fifteen sites; bcopy was
-already patched in that artifact, so its original first byte remains inferred.
+A successful self-test only confirms that the tested local logic behaves as expected.
 
-The exact static 14.02 bootstrap is also recorded now; it differs from 14.00
-only at the two `sys_mmap` protection immediates (`+0x400`). It remains blocked
-until an all-stock/all-final preflight protects every bootstrap write and the
-unused syscall slot.
+## Storage diagnostic
 
-The offline investigation and remaining launch gates are recorded in
-[the 14.02 port status](docs/14.02-port-status.md). The offline preflight
-classifier and guarded bootstrap prototype are research tools; neither is
-connected to the PS4 launch path.
+The separate `/d1/` diagnostic checks whether a browser storage marker survives a page reload.
 
-The runtime verifies every firmware-fixed binary before use:
+Passing this diagnostic does not demonstrate:
 
-```text
-goldhen.bin (official 14.00)       39452f5e1c305ac9efcb4745eef7958b4db8c6d85299529f08700970b009ea4d
-patchset.bin (14.00 only)         615f275b96831cc04173757db39e93f0d27b52888976af2a6444604aa8ac5dbf
-goldhen-1402-experimental.bin     23fa75217949cd1be4ba0531e726c05f4ca0a2e47ed9eedb598e23da4eeacca9
-supplied 14.02 compiled kpayload  5c643b05a52e06cc6a32a73b1780950a1ca90930e167f0a3eff9a56d54908c28
-```
+- WebKit exploit compatibility.
+- Kernel access.
+- GoldHEN compatibility.
+- Successful jailbreak execution.
 
-Licensed under the GNU Affero General Public License v3.0 or later. See
-`LICENSE`.
+## Research limitations
+
+The available 14.02 reference artifacts have known limitations and cannot all be treated as pristine stock firmware data.
+
+Previous investigations identified inconsistencies in supplied binary references and incomplete validation of the reconstructed candidate.
+
+The offline preflight and bootstrap prototypes are research tools only. They are not connected to an operational 14.02 launch path.
+
+No hardware validation or release certification is claimed.
+
+## Safety and stability
+
+A kernel panic can cause data loss or require a console restart.
+
+The previous 14.02 kernel panic is a significant warning and must not be treated as an acceptable validation result.
+
+The 14.02 launch remains disabled. No instructions or assurances for running the experimental candidate on physical hardware are provided.
+
+## Development and contributions
+
+Changes should preserve the separation between:
+
+- Existing firmware-specific functionality.
+- Offline diagnostic utilities.
+- Experimental research artifacts.
+
+Passing local tests must never be presented as proof of compatibility or hardware safety.
+
+## License
+
+Licensed under the GNU Affero General Public License v3.0 or later.
+
+See `LICENSE` for details.
