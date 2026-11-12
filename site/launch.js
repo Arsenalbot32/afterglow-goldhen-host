@@ -66,7 +66,7 @@
     var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem9&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem10&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -148,14 +148,22 @@
   }
 
   function beginCountdown() {
+    var preNotice = "";
+
     if (params.get("afterglow") === "done") {
       stop("GoldHEN payload thread started. Check the console notification; reboot before another attempt.");
       return;
     }
 
     if (params.get("afterglow") === "failed") {
-      stop("GoldHEN did not start. Quit and relaunch the browser to try again.");
-      return;
+      /* The previous run armed the kernel stage and did not finish, so it
+         left live kernel-side device handles behind. Closing the browser
+         is exactly what can hang on them (a frozen browser is recovered
+         by a console power cycle), so the retry runs in THIS browser
+         session: the countdown below relaunches with the failed run's
+         handles left inert. */
+      preNotice =
+        "Previous run lost the hook race -- retrying in this browser session. ";
     }
 
     if (params.get("afterglow") === "probe") {
@@ -174,8 +182,8 @@
       enableStorageTest(firmware);
       if (count) count.textContent =
         "EXPERIMENTAL 14.02 route: kernel chain proven on a retail dump, " +
-        "GoldHEN payload unverified on hardware. On a refusal just quit " +
-        "and relaunch the browser -- the page reloads fresh.";
+        "GoldHEN payload unverified on hardware. After a failed run the " +
+        "page retries in this browser session.";
     }
 
     if (start) {
@@ -191,8 +199,8 @@
       }
       if (count) {
         count.textContent =
+          preNotice +
           (experimental ? "EXPERIMENTAL 14.02 -- " : "") +
-          crashNotice +
           "GoldHEN starts in " + remaining +
           (remaining === 1 ? " second..." : " seconds...");
       }

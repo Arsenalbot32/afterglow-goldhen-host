@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402mem9";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem9";
-import { int64 } from "./int64.js?v=gh1402mem9";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem9";
+import { establishPrimitive } from "./core.js?v=gh1402mem10";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem10";
+import { int64 } from "./int64.js?v=gh1402mem10";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem10";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -1078,7 +1078,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402mem9");
+        const ag = await import("./afterglow-g.js?v=gh1402mem10");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,
@@ -1124,6 +1124,15 @@ let allDone = false,
         } catch (e) {}
       } catch (agError) {
         mark("AG-FAIL", agError && agError.message ? agError.message : String(agError));
+        /* The failed run leaves live kernel-side device handles behind.
+           Closing the browser is what can hang on them, so the retry runs
+           in this same browser session: press Circle to return to the
+           start page and the countdown relaunches. A frozen browser is
+           recovered by a console power cycle. */
+        mark(
+          "NEXT",
+          "press Circle to return to the start page -- it retries in this browser session; do not close the browser",
+        );
         allDone = true;
         markAttemptClear();
         finishUI(false);
