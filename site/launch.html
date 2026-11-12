@@ -4,6 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>afterglow</title>
+    <script>
+      /* Cache-bust: a launch page the browser restored (browser quit and
+         relaunched) must reload from the network, not HTTP cache.  A fresh
+         arrival from the landing page carries a current cb= stamp and a
+         landing referrer and is left alone. */
+      (function () {
+        try {
+          var m = location.search.match(/[?&]cb=(\d+)/);
+          var now = Date.now();
+          if (m && now - Number(m[1]) < 120000) return;
+          if (!m && /index\.html/.test(document.referrer)) return;
+          var keep = location.search.replace(/[?&]cb=\d+/, "");
+          location.replace(location.pathname + (keep ? keep + "&" : "?") + "cb=" + now);
+        } catch (e) {}
+      })();
+    </script>
     <style>
       :root {
         --bg: #0b0d10;
@@ -175,7 +191,7 @@
     </div>
     <p class="byline">by well0nez/m0zz</p>
     <script type="module">
-      import "./jb-g.js?v=gh1402panic3";
+      import "./jb-g.js?v=gh1402guard4";
     </script>
   </body>
 </html>

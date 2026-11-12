@@ -2040,7 +2040,7 @@ async function attempt(ctx, opts) {
   if (ctx.firmware === "14.02") {
     say("afterglow -- firmware 14.02 EXPERIMENTAL: kernel chain proven on a retail dump,");
     say("    guarded bootstrap + live sysent readout enabled; GoldHEN payload itself unverified on hardware");
-    say("    a refusal or kernel panic here is recovered by a cold boot (power off 30s)");
+    say("    on a refusal just quit and relaunch the browser -- the page reloads fresh");
   } else if (ctx.firmware !== "14.00") {
     say("afterglow -- firmware " + (ctx.firmware || "unknown")
         + " is not enabled in this release; stopping before the kernel stage");
@@ -2260,6 +2260,7 @@ async function attempt(ctx, opts) {
       if (!(nargOk && callOk && thrcntOk)) {
         say("[1c] UNEXPECTED sysent[11] -- refusing before any kernel write;");
         say("    please report these three values (narg/call/thrcnt) upstream");
+        say("    quit and relaunch the browser to try again");
         return false;
       }
       say("[1c] sysent[11] is exactly stock (or NULL) -- safe to continue");
@@ -2458,16 +2459,28 @@ async function attempt(ctx, opts) {
       2: "REFUSED -- kernel state mixed/unknown, nothing was written",
       3: "PADDING_DIRTY -- teardown area occupied, nothing was written",
       4: "ROLLED_BACK -- a write refused to stick, kernel restored to stock",
-      5: "ROLLBACK_FAILED -- kernel left PARTIALLY STOCK, cold boot now",
+      5: "ROLLBACK_FAILED -- kernel left PARTIALLY STOCK",
     };
-    say("[6] guarded bootstrap rc=" + bootRc + " (" + (BOOT_RC[bootRc] || "unknown") + ")");
+    say("[6] guarded bootstrap rc=" + bootRc + " (" + (BOOT_RC[bootRc] || "no report") + ")");
     if (bootRc === 2 || bootRc === 3) {
-      say("    refusing safely -- cold boot (power off 30s) before trying again");
+      say("    refusing safely -- quit and relaunch the browser to try again");
       return false;
     }
-    if (bootRc === 4 || bootRc === 5) {
-      say("    STOP -- power the console off for 30 seconds before anything else");
+    if (bootRc === 4) {
+      say("    kernel rolled back to stock -- quit and relaunch the browser to try again");
       return false;
+    }
+    if (bootRc === 5) {
+      say("    STOP -- the kernel is only partially stock: restart the console once before anything else");
+      return false;
+    }
+    if (bootRc !== 0 && bootRc !== 1) {
+      /* -1 or anything else: the ioctl did not reach the bootstrap this
+         time (the [5] hook lost its race).  The kernel is untouched and the
+         rwx probe below still decides; flag a retry so a lost race costs
+         one more attempt instead of the whole run. */
+      say("    the bootstrap did not report (hook race lost) -- kernel is fine, retrying");
+      STATE.retry = true;
     }
     /* 0 PATCHED or 1 ALREADY_FINAL: the kernel is exactly in the state
        the rest of the chain expects; carry on. */

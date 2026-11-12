@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>NanospeedGamer</title>
     <link rel="stylesheet" href="style.css" />
+    <script>
+      /* Cache-bust: the PS4 browser serves HTTP-cached pages when it is
+         relaunched.  A cb= stamp older than two minutes means this load is
+         a restore -- replace with a fresh stamp so the page is fetched
+         from the network again. */
+      (function () {
+        try {
+          var m = location.search.match(/[?&]cb=(\d+)/);
+          var now = Date.now();
+          if (m && now - Number(m[1]) < 120000) return;
+          var keep = location.search.replace(/[?&]cb=\d+/, "");
+          location.replace(location.pathname + (keep ? keep + "&" : "?") + "cb=" + now);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <canvas id="matrix"></canvas>
@@ -12,7 +27,7 @@
     <div class="content">
       <img class="logo" src="logo.png" alt="Logo" />
       <h1>NanospeedGamer</h1>
-      <p class="subtitle">PS4 14.00 · GoldHEN · 14.02 temporarily disabled</p>
+      <p class="subtitle">PS4 14.00 · GoldHEN · 14.02 experimental (guarded)</p>
       <div id="crash-report" role="alert" hidden>
         <strong>Previous run did not finish</strong>
         <p id="crash-summary"></p>
@@ -26,9 +41,9 @@
       <button id="start" type="button">Start GoldHEN now</button>
     </div>
 
-    <script src="matrix.js"></script>
-    <script src="breadcrumb.js?v=gh1402crumb1"></script>
-    <script src="launch.js?v=gh1402block2"></script>
+    <script src="matrix.js?v=gh1402guard4"></script>
+    <script src="breadcrumb.js?v=gh1402guard4"></script>
+    <script src="launch.js?v=gh1402guard4"></script>
   </body>
   <script>
   if (window.applicationCache) {

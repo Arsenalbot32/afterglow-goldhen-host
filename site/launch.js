@@ -45,7 +45,7 @@
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
     window.location.href =
-      "launch.html?v=gh1402crumb1&log=1&afterglow=run&mode=goldhen";
+      "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now();
   }
 
   function enableStorageTest(firmware) {
@@ -96,8 +96,8 @@
       enableStorageTest(firmware);
       if (count) count.textContent =
         "EXPERIMENTAL 14.02 route: kernel chain proven on a retail dump, " +
-        "GoldHEN payload unverified on hardware. A freeze is recovered by a " +
-        "cold boot (power off 30 seconds).";
+        "GoldHEN payload unverified on hardware. On a refusal just quit " +
+        "and relaunch the browser -- the page reloads fresh.";
     }
 
     if (start) {
