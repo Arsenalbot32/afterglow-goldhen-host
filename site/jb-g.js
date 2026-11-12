@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402ps1";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402ps1";
-import { int64 } from "./int64.js?v=gh1402ps1";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402ps1";
+import { establishPrimitive } from "./core.js?v=gh1402ps2";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402ps2";
+import { int64 } from "./int64.js?v=gh1402ps2";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402ps2";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -401,7 +401,7 @@ let allDone = false,
       const mv = /[?&]v=([A-Za-z0-9]+)/.exec(import.meta.url);
       if (mv) assetV = mv[1];
     } catch (e) {}
-    mark("BUILD", "jb=skipjb2 v=" + assetV + " base=ef1670a");
+    mark("BUILD", "jb=skipjb2 v=" + assetV + " base=ef1670a mem=" + (params.get("mem") || "0") + (params.get("hx1400") === "1" ? " hx1400=1" : ""));
     mark("FW", key || "(not a PS4 UA)");
     if (!off) {
       /* NONPS4-DEBUG */
@@ -1086,7 +1086,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402ps1");
+        const ag = await import("./afterglow-g.js?v=gh1402ps2");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,
