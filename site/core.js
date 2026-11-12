@@ -16,10 +16,11 @@ const HOLDER_BYTES = 0x40;
 const HX1400_LIGHT_CORE =
   new URLSearchParams(location.search).get("hx1400") === "1";
 
-// Heap profile, chosen with ?mem. The default is the heaviest groom of all
-// -- 12 million slots, drain 512, around 130 MB -- and that is where
-// placement-throw and zero-header-miss cluster. Selecting a lighter profile
-// is therefore worth trying when a console keeps missing.
+// Heap profile, chosen with ?mem. The default (no profile) is the heaviest
+// groom of all -- drain 512 -- and that is where placement-throw and
+// zero-header-miss cluster. Selecting a lighter profile is therefore worth
+// trying when a console keeps missing. The profiles lighten the groom only;
+// the carrier ceiling is independent of them (see CARRIER_CAP below).
 const HX_MEM_LEVEL = (function () {
   try {
     const q = new URLSearchParams(location.search).get("mem");
@@ -114,7 +115,18 @@ const HX_MEM =
 // 1.85 MB is enough. So the carrier starts small and grows only when
 // `sourceCovered` rejects an attempt, which keeps the largest piece of work
 // out of the window in which fakeHost's layout has to hold still.
-const CARRIER_CAP = HX_MEM ? HX_MEM.slots : 12000000;
+//
+// The ceiling is deliberately independent of the heap profile: the profile
+// lightens the groom (drain/slab/hole sizes) while the carrier grows on
+// demand to exactly the measured need, so a light profile saves nothing by
+// clamping the carrier too. Clamping it to the profile's slot count (as
+// this file once did, via HX_MEM.slots) turned any big heap-lottery draw
+// into a guaranteed covered=false loop: under mem2-low's 1,500,000-slot cap
+// a draw needing 4,425,346 slots (observed on hardware, 2026-11-12) made
+// growCarrier refuse, every retry fail identically, and the run give up at
+// the attempt ceiling. The absolute ceiling is CARRIER_MAX below, which
+// covers the largest regime ever measured (8,619,650 slots).
+const CARRIER_CAP = 12000000;
 
 let CARRIER_SLOTS = Math.min(CARRIER_CAP, 400000);
 let CARRIER_BYTES = CARRIER_SLOTS * 8;
