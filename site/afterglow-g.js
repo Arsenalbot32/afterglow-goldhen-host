@@ -945,6 +945,29 @@ const PATCHSET_1400 = {
   length: 641,
   sha256: "615f275b96831cc04173757db39e93f0d27b52888976af2a6444604aa8ac5dbf",
 };
+/* The 14.02 variant relocates the fourteen patchset writes whose kernel
+   regions moved between the firmwares, to the targets this host has
+   already hardware-validated in PATCH_WINDOWS_1402: the dlsym family
+   +0x220 (0x1b7a43 -> 0x1b7c63, 0x1b7a53 -> 0x1b7c73, 0x1b7a73 ->
+   0x1b7c93, 0x1b7504 -> 0x1b7724, 0x1b7ab8 -> 0x1b7cd8), the bcopy
+   family +0x300 (0x2bd79d -> 0x2bda9d .. 0x2bdfcd -> 0x2be2cd), and the
+   sysVeri family +0x480 (0x628684 -> 0x628b04, 0x628f6f -> 0x6293ef).
+   The Akatsuki mirror line relocates only ONE of these (its sysVeri byte
+   0xC5: 0x8f -> 0x92, targeting 0x62926f, which contradicts this host's
+   validated windows) and leaves the other thirteen at their 14.00 RVAs,
+   so its blob would re-corrupt the moved regions on 14.02 -- it is NOT
+   used here.  The patchset-only sites (0x490/0x4b5/0x4b9/0x4c2, the
+   0xab4 gate install, 0x2fcb5c, 0x391fc6, 0x3be3c0, 0x1faada/0x1faadd,
+   the 0x1257xx block) keep their 14.00 RVAs: the reference dump shows
+   the 14.00-RVA writes landing on coherent instruction boundaries and
+   the console surviving, but no pristine 14.02 stock comparison exists
+   for them -- a residual, documented risk.  sysent[11]
+   (0x1102d80/0x1102d88/0x1102dac) is confirmed at the same RVAs on 14.02
+   by the guarded bootstrap's site table and the live [1c] read-out. */
+const PATCHSET_1402 = {
+  length: 641,
+  sha256: "3da60b1fcbda2cba47703e4b94e6bb88ff8ca5408ab0dd55d54da66cea146300",
+};
 
 function sha256Hex(bytes) {
   const K = [
@@ -1025,14 +1048,66 @@ function verifiedAsset(bytes, expected, label) {
    GoldHEN up (FTP answered) but left it running without its patches. */
 async function runPatchSet(room, k, kbase) {
   const c = host();
-  const pset = await fetchBytes("patchset.bin", "g");
-  if (!pset || !pset.length) {
-    say("[g] patchset.bin not available from HTTP");
+  const fw = c.firmware || "unknown";
+  const is1402 = fw === "14.02";
+  const asset = is1402 ? "patchset-1402.bin" : "patchset.bin";
+  const expected = is1402 ? PATCHSET_1402 : PATCHSET_1400;
+  const label = is1402 ? "14.02 patchset (14 sites relocated, sysVeri at +0x6293ef)" : "14.00 patchset";
+  if (fw !== "14.00" && fw !== "14.02") {
+    say("[g] no patchset for firmware " + fw + " -- refusing");
     return false;
   }
-  if (!verifiedAsset(pset, PATCHSET_1400, "14.00 patchset")) return false;
+  if (is1402) {
+    /* Live site guards, checked while the kernel is still untouched.  The
+       patchset's writes whose regions moved are relocated to the same
+       validated targets PATCH_WINDOWS_1402 uses; before anything is written,
+       the two sysVeri-family sites must look exactly stock (or, on a re-run,
+       exactly final), and the old 14.00 RVAs must NOT carry a previous
+       run's corruption. */
+    const stale = k.read(plus(kbase, 0x628f6f), 2);
+    const stale2 = k.read(plus(kbase, 0x628684), 2);
+    const looksWritten = function (b) {
+      return b && b.length === 2 && b[0] === 0xeb && b[1] === 0x00;
+    };
+    if (looksWritten(stale) || looksWritten(stale2)) {
+      say("[g] kernel+0x628f6f/0x628684 already hold eb 00 -- a previous run");
+      say("[g] wrote the 14.00 patchset RVAs on 14.02 and corrupted the moved");
+      say("[g] regions.  The damage lives until the next boot: power off 30 s,");
+      say("[g] then retry.");
+      return false;
+    }
+    /* stock and final eight-byte windows, straight from PATCH_WINDOWS_1402 */
+    const win = function (rva, stock, label) {
+      const b = k.read(plus(kbase, rva), 8);
+      if (!b || b.length !== 8) {
+        say("[g] " + label + " site kernel+0x" + rva.toString(16) + " unreadable -- refusing");
+        return false;
+      }
+      const hex = function (x) { return ("0" + x.toString(16)).slice(-2); };
+      const got = b.map(hex).join("");
+      if (got === stock) {
+        say("[g] " + label + " site stock window confirmed -- guard passed");
+        return true;
+      }
+      if (b[0] === 0xeb && b[1] === 0x00 && got.slice(4) === stock.slice(4)) {
+        say("[g] " + label + " site already final -- idempotent re-run");
+        return true;
+      }
+      say("[g] " + label + " site kernel+0x" + rva.toString(16) + " is " + got
+          + ", expected stock " + stock + " -- refusing");
+      return false;
+    };
+    if (!win(0x6293ef, "7541488d3df87403", "sysVeri (delayed panic on suspend)")) return false;
+    if (!win(0x628b04, "74074883c4085b5d", "self verification")) return false;
+  }
+  const pset = await fetchBytes(asset, "g");
+  if (!pset || !pset.length) {
+    say("[g] " + asset + " not available from HTTP");
+    return false;
+  }
+  if (!verifiedAsset(pset, expected, label)) return false;
   wrbuf(plus(room, 0xc0), pset);
-  say("[g] patchset.bin loaded " + pset.length + " bytes -- calling gate");
+  say("[g] " + asset + " loaded " + pset.length + " bytes -- calling gate");
   const pr = c.callAddr(plus(room, GATE), [11, plus(room, 0xc0)]);
   say("[g] [0] kernel patch set, " + pset.length + " bytes from the libc tail -> 0x"
       + ((pr && pr.lo >>> 0) || 0).toString(16));
@@ -1044,6 +1119,18 @@ async function runPatchSet(room, k, kbase) {
   if (!check || check.length !== 2 || check[0] !== 0xeb || check[1] !== 0x04) {
     say("[g] patchset read-back failed at kernel +0x2fcb5c");
     return false;
+  }
+  if (is1402) {
+    const sv = k.read(plus(kbase, 0x6293ef), 2);
+    if (!sv || sv.length !== 2 || sv[0] !== 0xeb || sv[1] !== 0x00) {
+      say("[g] patchset read-back failed at kernel +0x6293ef (sysVeri)");
+      return false;
+    }
+    const sf = k.read(plus(kbase, 0x628b04), 2);
+    if (!sf || sf.length !== 2 || sf[0] !== 0xeb || sf[1] !== 0x00) {
+      say("[g] patchset read-back failed at kernel +0x628b04 (self verification)");
+      return false;
+    }
   }
   say("[g] patchset read-back verified");
   return true;
@@ -1102,14 +1189,15 @@ async function loadEnabler(url, k, kbase, room) {
   if (blob === null || !blob) return false;
   if (!verifiedAsset(blob, expected, label)) return false;
   if (blob[0] !== 0xe9) { say("[e] GoldHEN entry is not a leading jmp -- refusing"); return false; }
+  /* The 14.02 patchset variant (patchset-1402.bin, fourteen sites
+     relocated to the validated PATCH_WINDOWS_1402 targets) is guarded
+     live: runPatchSet checks the sysVeri-family stock windows before
+     anything is written, refuses a kernel that already carries the
+     14.00-RVA corruption, and read-backs both relocated sysVeri-family
+     writes after the gate.  The 14.00 route keeps patchset.bin. */
+  if (!(await runPatchSet(room, k, kbase))) return false;
   if (candidate1402) {
-    /* The ZIP's patchset is byte-for-byte the 14.00 build and writes fixed
-       kernel addresses.  The reconstructed 14.02 payload applies its own
-       known GoldHEN patches; never corrupt 14.02 by running the 14.00 blob. */
-    say("[e] 14.02 experimental route: 14.00 patchset deliberately skipped");
     say("[e] ShellCore, ShellUI and RemotePlay patch installers remain disabled in this candidate");
-  } else if (!(await runPatchSet(room, k, kbase))) {
-    return false;
   }
   return loadPayload(asset, blob);
 }

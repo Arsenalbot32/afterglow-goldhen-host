@@ -76,6 +76,22 @@ and rolls the kernel back if the read-back disagrees. Its return value is
 captured and every non-success status aborts the run before the payload
 stage. The 14.00 route is byte-for-byte untouched.
 
+The kernel patch set now runs on 14.02 as a corrected variant,
+`site/patchset-1402.bin`: the 14.00 blob with the fourteen write
+displacements whose kernel regions moved relocated to the targets this
+host has already hardware-validated in its 14.02 patch windows (dlsym
+family +0x220, bcopy family +0x300, sysVeri family +0x480 — the 14.00
+sysVeri RVA is mid-instruction on 14.02 and corrupts a call when
+written). The Akatsuki mirror's one-byte variant is not used: it
+relocates only one site and leaves the other thirteen moved writes at
+their 14.00 RVAs. `runPatchSet` adds live guards on 14.02 —
+stale-corruption checks at the old RVAs, full eight-byte stock-window
+acceptance at the relocated sites, and post-write read-backs — and
+refuses before any write if the kernel does not look exactly as
+expected. The patchset-only sites keep their 14.00 RVAs, which the
+reference dump supports but which have no pristine stock comparison:
+a residual, documented risk.
+
 No hardware validation of the 14.02 payload or release certification is
 claimed; the guarded route limits damage, it does not certify safety.
 

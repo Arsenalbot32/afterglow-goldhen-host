@@ -89,7 +89,7 @@
     var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem19&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402ps1&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {

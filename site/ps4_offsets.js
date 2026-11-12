@@ -649,5 +649,7 @@ PS4["14.02"] = Object.assign({}, PS4["14.00"], {
     "state=14.02 " +
     "webkit=assumed-13.52-identical " +
     "kernel=afterglow-1402 (apm-UAF, offsets from 14.00 + shiftfit) " +
+    "kpatch=patchset-1402.bin (sysVeri +0x3000, dump-verified, live-guarded) " +
     "payload=goldhen-1402-experimental.bin (core candidate; shell patches disabled)",
+  kpatch: "patchset-1402.bin",
 });
