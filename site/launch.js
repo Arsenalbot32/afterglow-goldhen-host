@@ -44,8 +44,14 @@
 
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
+    var mem = "";
+    try {
+      var raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null");
+      if (raw && isFinite(raw.level) && raw.level > 0 && raw.level <= 5)
+        mem = "&mem=" + raw.level;
+    } catch (e) {}
     window.location.href =
-      "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now();
+      "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function enableStorageTest(firmware) {
@@ -114,6 +120,7 @@
       if (count) {
         count.textContent =
           (experimental ? "EXPERIMENTAL 14.02 -- " : "") +
+          crashNotice +
           "GoldHEN starts in " + remaining +
           (remaining === 1 ? " second..." : " seconds...");
       }
@@ -146,6 +153,29 @@
     });
     return true;
   }
+
+  /* If the last run died mid-primitive (out-of-memory kill: no JS ever
+     ran again, so the attempt flag in localStorage is still set), step
+     the heap profile down one level so the next run grooms less memory.
+     Profiles live in core.js (?mem=1..5); level 0 is the heaviest. */
+  var crashNotice = "";
+  (function escalateAfterCrash() {
+    try {
+      var attempt = null;
+      try { attempt = localStorage.getItem("jb-primitive-attempt"); } catch (e) {}
+      if (!attempt) return;
+      var raw = null;
+      try { raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null"); } catch (e) {}
+      var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
+      var next = Math.min(level + 1, 5);
+      try {
+        localStorage.setItem("jb-mem-level", JSON.stringify({ level: next, ts: Date.now() }));
+        localStorage.removeItem("jb-primitive-attempt");
+      } catch (e) { return; }
+      crashNotice = "Previous run ran out of memory -- using lighter heap profile mem=" + next + ". ";
+      if (count) count.textContent = crashNotice + "GoldHEN starts in " + remaining + " seconds...";
+    } catch (e) {}
+  })();
 
   var landingFirmware = detectedFirmware();
   if (landingFirmware === "14.02") {

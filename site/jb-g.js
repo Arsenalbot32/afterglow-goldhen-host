@@ -22,6 +22,35 @@ let retryShown = false;
    for an acknowledgement instead. */
 let kernelArmed = false;
 
+/* Heap-profile escalation. The primitive's default groom pins ~130 MB and
+   some consoles run out of memory and kill the WebProcess mid-attempt --
+   no JS runs, so the only witness is this localStorage flag, still set
+   from before the attempt. The landing page sees it on the next load and
+   steps the ?mem= profile down one level. Cleared the moment the primitive
+   succeeds or the run ends alive, so only a real process death escalates. */
+const ATTEMPT_KEY = "jb-primitive-attempt";
+const MEM_KEY = "jb-mem-level";
+function markAttemptStart() {
+  try { localStorage.setItem(ATTEMPT_KEY, String(Date.now())); } catch (e) {}
+}
+function markAttemptClear() {
+  try { localStorage.removeItem(ATTEMPT_KEY); } catch (e) {}
+}
+function escalateMemLevel() {
+  try {
+    var raw = null;
+    try { raw = JSON.parse(localStorage.getItem(MEM_KEY) || "null"); } catch (e) {}
+    var level = raw && Number.isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
+    if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) level = 0;
+    if (level >= 5) return 5;
+    level += 1;
+    localStorage.setItem(MEM_KEY, JSON.stringify({ level: level, ts: Date.now() }));
+    return level;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function showNotice(text) {
   try {
     const box = document.createElement("div");
@@ -42,6 +71,7 @@ function showRetry() {
      sessionStorage so a systematic failure cannot loop forever; the cap
      clears the moment the primitive succeeds. */
   if (kernelArmed) return;
+  markAttemptClear();
   try {
     var KEY = "jb-g-fail-reload";
     var n = parseInt(sessionStorage.getItem(KEY) || "0", 10);
@@ -654,6 +684,7 @@ let allDone = false,
         return false;
       }
       mark("AUTO-RELOAD", "why=" + why + " reload=" + (n + 1) + "/" + RETRY_MAX);
+      markAttemptClear();
       setTimeout(() => {
         try {
           location.reload();
@@ -665,6 +696,7 @@ let allDone = false,
       mark("AUTO-RELOAD-RESUME", "reload=" + retryCount() + "/" + RETRY_MAX);
 
     state("running the primitive...", "warn");
+    markAttemptStart();
     await new Promise((r) => setTimeout(r, 0));
 
     const PRIMITIVE_LOUD = /FAIL|ERROR|THREW|RETRY|ABORT|PASS/i;
@@ -688,6 +720,7 @@ let allDone = false,
         "   (promotion off: the 137 MB stays pinned)",
     );
     mark("PRIMITIVE-OK", "");
+    markAttemptClear();
     try { sessionStorage.removeItem("jb-g-fail-reload"); } catch (e) {}
 
     const cell = p.leakval(Math.expm1);
@@ -1057,6 +1090,7 @@ let allDone = false,
           if (!agOk) throw new Error("GoldHEN payload thread did not start");
         }
         allDone = true;
+        markAttemptClear();
         finishUI(agOk);
         if (agOk) {
           try {
@@ -1076,6 +1110,7 @@ let allDone = false,
       } catch (agError) {
         mark("AG-FAIL", agError && agError.message ? agError.message : String(agError));
         allDone = true;
+        markAttemptClear();
         finishUI(false);
         try { history.replaceState(null, "", "index.html?afterglow=failed"); } catch (e) {}
       }
@@ -1085,11 +1120,21 @@ let allDone = false,
     }
     mark("JB-END", "afterglow is the kernel stage -- without afterglow= nothing runs here");
     allDone = true;
+    markAttemptClear();
     try { if (mainArmed && mainMf && mainOrig && p) { p.write8(mainMf, mainOrig); mainArmed = false; } } catch (e) {}
     try { finishUI(false); } catch (e) {}
   } catch (eOuter) {
     try { mark("JB-THREW", (eOuter && eOuter.message) || String(eOuter)); } catch (e) {}
     try { clearInterval(watchdog); } catch (e) {}
+    // An allocation failure that reaches JS as an exception escalates the
+    // heap profile right away; a kill leaves the attempt flag behind for
+    // the landing page to see.
+    try {
+      if (/memory|insufficient|alloc/i.test(String(eOuter && eOuter.message || eOuter))) {
+        const lvl = escalateMemLevel();
+        mark("OOM-ESCALATE", "mem=" + lvl);
+      }
+    } catch (e) {}
     // Put it on the television. A failure in the WebKit stage touched
     // NOTHING -- no apm unit spent, no kernel byte written. Reopening the
     // browser is enough; rebooting the console would waste a cycle.
