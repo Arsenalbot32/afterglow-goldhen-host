@@ -1145,6 +1145,33 @@ async function loadPayload(url, vorab) {
       say("[p] copy mismatch at 0x" + o.toString(16)); return false;
     }
   }
+  /* 14.02 candidate fixes, ported from the Akatsuki host line. The
+     reconstructed 14.02 build resolves two imports to bad kernel
+     addresses: the IMP_DISABLE_CONSOLE_OUTPUT write (image 0x1068)
+     targets a bad 14.02 address and freezes the console, and the
+     M_TEMP import (image 0x3490, the movabs immediate's high dword)
+     resolves into kernel text -- 0x2be1f0 -- instead of the malloc
+     data zone, so kernel malloc writes into kernel code and the
+     console panics. Patch the staged copy only (the served asset and
+     its verified hash stay untouched): NOP the console-output write
+     and point M_TEMP at kbase+0x1520d00, the data zone the kernel's
+     own malloc callers use. */
+  if ((host().firmware || "") === "14.02") {
+    for (let o = 0; o < 10; o++) wr1(plus(entry, 0x1068 + o), 0x90);
+    wr1(plus(entry, 0x3490), 0x00); wr1(plus(entry, 0x3491), 0x0d);
+    wr1(plus(entry, 0x3492), 0x52); wr1(plus(entry, 0x3493), 0x01);
+    say("[p] 14.02 import fixes: console-output write NOP'd (0x1068), M_TEMP -> kbase+0x1520d00 (0x3490)");
+    /* Optional loader-only diagnostic run (?kpdiag=1): NOP the kpayload
+       entry call (image 0x1136, ff542408) so goldhen_main returns after
+       elf_load. If the console survives this run, malloc+elf_load work
+       on the real kernel stack and any remaining panic is inside the
+       kpayload entry itself. */
+    if (typeof location !== "undefined" &&
+        location.search.indexOf("kpdiag=1") !== -1) {
+      for (let o = 0; o < 4; o++) wr1(plus(entry, 0x1136 + o), 0x90);
+      say("[p] kpdiag: kpayload entry call NOP'd (0x1136) -- loader-only run");
+    }
+  }
   say("[p] payload copied and verified, starting thread");
 
   /* The table blanks both pthread_create fields for this firmware, but only
