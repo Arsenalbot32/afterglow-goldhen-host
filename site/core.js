@@ -130,6 +130,12 @@ const CARRIER_CAP = 12000000;
 
 let CARRIER_SLOTS = Math.min(CARRIER_CAP, 400000);
 let CARRIER_BYTES = CARRIER_SLOTS * 8;
+/* The last measured coverage need. When a bigger carrier makes the need
+   BIGGER, the target is running away with the carrier (observed on
+   hardware: need 4,425,346 -> grow to 4,425,346 -> need 8,619,650) --
+   growing further chases it forever, and the grown layout eventually
+   breaks deserialization outright. */
+let CARRIER_NEED = null;
 
 // A rejection does not draw a new lottery ticket: within one page load
 // `chars` is stable, so a run that is refused once will be refused again with
@@ -1423,8 +1429,26 @@ function beginComposition() {
   );
 
   if (!(repeated && distinct && plausible && sourceCovered)) {
-    if (!sourceCovered && growCarrier(minimumSlots))
-      emit("TRAEGER-WACHSEN", `slots=${CARRIER_SLOTS}-bytes=${CARRIER_BYTES}`);
+    if (!sourceCovered) {
+      const runaway = CARRIER_NEED !== null && minimumSlots > CARRIER_NEED;
+      const grew = growCarrier(minimumSlots);
+      if (runaway || !grew) {
+        /* The draw ran away with the carrier (or the cap was reached): a
+           bigger carrier only pushes the target further out and the
+           grown layout eventually breaks deserialization. Reset the
+           carrier to the small start and lighten the groom -- a
+           different layout is a fresh ticket instead of a chase. */
+        CARRIER_SLOTS = Math.min(CARRIER_CAP, 400000);
+        CARRIER_BYTES = CARRIER_SLOTS * 8;
+        CARRIER_NEED = null;
+        lightenGroom();
+        emit("CARRIER-RUNAWAY-RESET",
+          `need=${minimumSlots}-reset-to=${CARRIER_SLOTS}`);
+      } else {
+        CARRIER_NEED = minimumSlots;
+        emit("TRAEGER-WACHSEN", `slots=${CARRIER_SLOTS}-bytes=${CARRIER_BYTES}`);
+      }
+    }
     finishEarlySafeAttempt(
       "ADDROF-FAIL",
       `repeat=${repeated}-distinct=${distinct}` +
