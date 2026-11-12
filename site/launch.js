@@ -57,7 +57,28 @@
     var raw = storedMem();
     var level = raw ? raw.level : 0;
     if (level === 0 && detectedFirmware() === "14.02") level = 2;
+    /* An automatic retry after a live-page give-up rotates the groom
+       profile: the addrof coverage draw is a function of the groom
+       geometry, and a console whose draw is pathologically stable under
+       one profile (observed: minSlots 4.4M/8.6M under mem=2 on every
+       run) only escapes by changing it. Retry 1 -> mem3, 2 -> mem1,
+       3 -> mem4. */
+    var rotated = autoRetryMemLevel();
+    if (rotated !== null) level = rotated;
     return level;
+  }
+
+  /* The give-up path on the run page counts its self-reloads in
+     sessionStorage ("jb-g-fail-reload"); each of those reloads relaunches
+     through here, and each gets a different groom geometry. */
+  function autoRetryMemLevel() {
+    var n = 0;
+    try {
+      n = parseInt(sessionStorage.getItem("jb-g-fail-reload") || "0", 10);
+    } catch (e) {}
+    if (!isFinite(n) || n <= 0) return null;
+    var seq = { 1: 3, 2: 1, 3: 4 };
+    return seq[n] !== undefined ? seq[n] : null;
   }
 
   function runUrl() {
@@ -65,7 +86,7 @@
     var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem17&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem18&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -122,7 +143,11 @@
         ? "Heap groom: " + MEM_LABELS[raw.level] + " (chosen)"
         : "Heap groom: auto";
       if (note) {
-        if (explicit && raw.level === 0 && detectedFirmware() === "14.02") {
+        if (autoRetryMemLevel() !== null) {
+          note.textContent =
+            "Auto-retry rotation: the next run uses a different groom " +
+            "profile (the addrof draw depends on the groom geometry).";
+        } else if (explicit && raw.level === 0 && detectedFirmware() === "14.02") {
           note.textContent =
             "mem=0 is the heaviest groom and crashes the browser on 14.02: " +
             "the next run will use mem=2 automatically. Cycle back to auto " +
