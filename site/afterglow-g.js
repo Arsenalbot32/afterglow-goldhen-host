@@ -210,6 +210,17 @@ const PATCH_WINDOWS_1402 = [
 
 const STATE = { ctx: null, units: {}, clones: 0, base: null, stubs: {}, batch: undefined, retry: false };
 
+/* ?seed=N pins the shot's clone seed -- the reclaim lottery's main knob,
+   for manual tuning across runs. Without it each shot of a run varies
+   the seed around the tuned value so three shots are three different
+   tickets, not the same ticket three times. */
+try {
+  if (typeof location !== "undefined" && location.search) {
+    const m = /(?:^|[?&])seed=(\d{1,3})/.exec(location.search);
+    if (m) STATE.seedOverride = Math.max(8, Math.min(200, parseInt(m[1], 10)));
+  }
+} catch (e) {}
+
 function host() {
   if (!STATE.ctx) throw new Error("afterglow: no host installed");
   return STATE.ctx;
@@ -530,11 +541,22 @@ function shooter(gad) {
        reached this far all sat on a shot that had seeded eight. Seeding
        happens before the free, so it costs nothing in the window that
        decides the outcome. */
-    const want = TUNE.seed;
+    /* Per-shot seed variation: the reclaim is a heap-lottery, and three
+       identical tickets never win it. Vary the clone seed around the
+       tuned value (0, -8, +8) so each shot of a run buys a different
+       ticket; ?seed=N pins it for manual tuning. Seeding happens before
+       the free, so it costs nothing in the window that decides the
+       outcome. */
+    const seq = (STATE.shotSeq = ((STATE.shotSeq || 0) + 1) % 3);
+    const seedVar = (STATE.seedOverride !== undefined) ? 0 : [0, -8, 8][seq];
+    const want = Math.max(TUNE.spare,
+      (STATE.seedOverride !== undefined ? STATE.seedOverride : TUNE.seed) + seedVar);
     for (let i = 0; i < want; i++) {
       if (this.hold("/dev/apm") < 0) break;
       STATE.clones++;
     }
+    say("    shot " + this.fired + " seed " + want +
+        (STATE.seedOverride !== undefined ? " (pinned by ?seed=)" : ""));
 
     const socks = [];
     for (let i = 0; i < TUNE.sprays; i++) {
