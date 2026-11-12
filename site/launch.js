@@ -29,6 +29,18 @@
     if (start) start.style.display = "none";
   }
 
+  function runUrl() {
+    var mem = "";
+    try {
+      var raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null");
+      if (raw && isFinite(raw.level) && raw.level > 0 && raw.level <= 5)
+        mem = "&mem=" + raw.level;
+    } catch (e) {}
+    // This must be a normal navigation from index.html. jb-g.js checks the
+    // same-origin referrer before it will arm the kernel stage.
+    return "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+  }
+
   function launchGoldHEN() {
     if (launched) return;
     var firmware = detectedFirmware() || "unknown";
@@ -42,16 +54,7 @@
     if (start) start.disabled = true;
     if (count) count.textContent = "Starting GoldHEN...";
 
-    // This must be a normal navigation from index.html. jb-g.js checks the
-    // same-origin referrer before it will arm the kernel stage.
-    var mem = "";
-    try {
-      var raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null");
-      if (raw && isFinite(raw.level) && raw.level > 0 && raw.level <= 5)
-        mem = "&mem=" + raw.level;
-    } catch (e) {}
-    window.location.href =
-      "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    window.location.href = runUrl();
   }
 
   function enableStorageTest(firmware) {
@@ -158,25 +161,6 @@
      ran again, so the attempt flag in localStorage is still set), step
      the heap profile down one level so the next run grooms less memory.
      Profiles live in core.js (?mem=1..5); level 0 is the heaviest. */
-  var crashNotice = "";
-  (function escalateAfterCrash() {
-    try {
-      var attempt = null;
-      try { attempt = localStorage.getItem("jb-primitive-attempt"); } catch (e) {}
-      if (!attempt) return;
-      var raw = null;
-      try { raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null"); } catch (e) {}
-      var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
-      var next = Math.min(level + 1, 5);
-      try {
-        localStorage.setItem("jb-mem-level", JSON.stringify({ level: next, ts: Date.now() }));
-        localStorage.removeItem("jb-primitive-attempt");
-      } catch (e) { return; }
-      crashNotice = "Previous run ran out of memory -- using lighter heap profile mem=" + next + ". ";
-      if (count) count.textContent = crashNotice + "GoldHEN starts in " + remaining + " seconds...";
-    } catch (e) {}
-  })();
-
   var landingFirmware = detectedFirmware();
   if (landingFirmware === "14.02") {
     if (!diagnostics) {
@@ -193,5 +177,53 @@
       previous.stage === "kernel-armed";
     if (reachedKernel && holdForPreviousRun(previous)) return;
   }
-  beginCountdown();
+
+  /* The last run was killed by an out-of-memory dialog (attempt flag still
+     set in localStorage, or its cookie twin).  Step the heap profile down
+     two levels and go STRAIGHT to the run page -- no countdown, no extra
+     click -- because nothing was written before the kill.  Gives up after
+     six kills: then even the lightest groom does not fit and the browser
+     itself needs a full close (Options button) or the console a restart. */
+  var escalateScheduled = (function escalateAfterCrash() {
+    try {
+      var attempt = null;
+      try { attempt = localStorage.getItem("jb-primitive-attempt"); } catch (e) {}
+      if (!attempt) {
+        try {
+          var m = /(?:^|;\s*)jbpa=(\d)/.exec(document.cookie || "");
+          if (m) attempt = m[1];
+        } catch (e) {}
+      }
+      if (!attempt) return false;
+      var raw = null;
+      try { raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null"); } catch (e) {}
+      var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
+      var crashes = raw && isFinite(raw.crashes) ? raw.crashes : 0;
+      if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) { level = 0; crashes = 0; }
+      var next = Math.min(level + 2, 5);
+      crashes += 1;
+      try {
+        localStorage.setItem("jb-mem-level", JSON.stringify({ level: next, ts: Date.now(), crashes: crashes }));
+        localStorage.removeItem("jb-primitive-attempt");
+      } catch (e) {}
+      try { document.cookie = "jbpa=; path=/; max-age=0"; } catch (e) {}
+      launched = true;
+      if (timer !== null) window.clearInterval(timer);
+      if (start) { start.style.display = "none"; start.disabled = true; }
+      if (count) count.textContent =
+        crashes > 6
+          ? "Out of memory even on the lightest profile (crash " + crashes +
+            "). Fully close the browser (Options) or restart the console, then reopen this page."
+          : "Previous run ran out of memory -- retrying directly with the lighter heap profile mem=" + next + "...";
+      if (crashes > 6) return false;
+      window.setTimeout(function () {
+        try { window.location.href = runUrl(); } catch (e) {}
+      }, 1500);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  if (!escalateScheduled) beginCountdown();
 })();

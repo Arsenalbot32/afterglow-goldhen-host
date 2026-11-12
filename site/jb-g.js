@@ -32,19 +32,27 @@ const ATTEMPT_KEY = "jb-primitive-attempt";
 const MEM_KEY = "jb-mem-level";
 function markAttemptStart() {
   try { localStorage.setItem(ATTEMPT_KEY, String(Date.now())); } catch (e) {}
+  /* localStorage writes are not guaranteed durable across a WebProcess
+     kill, so the same flag goes out as a cookie as well; the landing page
+     believes whichever one survived. */
+  try { document.cookie = "jbpa=1; path=/; max-age=1800"; } catch (e) {}
 }
 function markAttemptClear() {
   try { localStorage.removeItem(ATTEMPT_KEY); } catch (e) {}
+  try { document.cookie = "jbpa=; path=/; max-age=0"; } catch (e) {}
 }
 function escalateMemLevel() {
   try {
     var raw = null;
     try { raw = JSON.parse(localStorage.getItem(MEM_KEY) || "null"); } catch (e) {}
     var level = raw && Number.isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
-    if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) level = 0;
-    if (level >= 5) return 5;
-    level += 1;
-    localStorage.setItem(MEM_KEY, JSON.stringify({ level: level, ts: Date.now() }));
+    var crashes = raw && Number.isFinite(raw.crashes) ? raw.crashes : 0;
+    if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) { level = 0; crashes = 0; }
+    /* Step two levels per kill: a console that OOMs at 130 MB should not
+       burn four crashes to learn that it needs the ~15 MB groom. */
+    level = Math.min(level + 2, 5);
+    crashes += 1;
+    localStorage.setItem(MEM_KEY, JSON.stringify({ level: level, ts: Date.now(), crashes: crashes }));
     return level;
   } catch (e) {
     return 0;
@@ -720,7 +728,10 @@ let allDone = false,
         "   (promotion off: the 137 MB stays pinned)",
     );
     mark("PRIMITIVE-OK", "");
-    markAttemptClear();
+    /* The attempt flag deliberately survives the primitive: an OOM kill
+       between here and the end of the kernel stage must still escalate.
+       Every live end-of-run path clears it (see AG-FAIL / JB-END /
+       showRetry / retryBenign). */
     try { sessionStorage.removeItem("jb-g-fail-reload"); } catch (e) {}
 
     const cell = p.leakval(Math.expm1);
