@@ -47,17 +47,16 @@
     return null;
   }
 
-  /* Effective groom level for the next run. An explicit choice from the
-     landing-page selector is honoured as-is (a user who picks the heaviest
-     groom on 14.02 knows what they chose: the carrier no longer multiplies
-     the profile's cost). Without one, 14.02 still starts on the light
-     groom by default and the crash ladder below still stores its own
-     levels. */
+  /* Effective groom level for the next run. mem=0 is the heaviest groom
+     and is known to trigger out-of-memory kills and random crashes on the
+     14.02 experimental route, so it is never run there: explicit or not,
+     14.02 falls back to the light default (mem=2). 14.00 is unchanged and
+     keeps honouring an explicit mem=0. The crash ladder below still stores
+     its own levels. */
   function effectiveMemLevel() {
     var raw = storedMem();
     var level = raw ? raw.level : 0;
-    if ((!raw || !raw.explicit) && level === 0 &&
-        detectedFirmware() === "14.02") level = 2;
+    if (level === 0 && detectedFirmware() === "14.02") level = 2;
     return level;
   }
 
@@ -118,13 +117,21 @@
     function refresh() {
       var raw = storedMem();
       var explicit = raw && raw.explicit;
+      var level = effectiveMemLevel();
       btn.textContent = explicit
         ? "Heap groom: " + MEM_LABELS[raw.level] + " (chosen)"
         : "Heap groom: auto";
       if (note) {
-        note.textContent = explicit
-          ? "Next run uses ?mem=" + raw.level + ". Cycle back to auto for the defaults."
-          : "Auto: heaviest on 14.00, light on 14.02, lighter after memory crashes.";
+        if (explicit && raw.level === 0 && detectedFirmware() === "14.02") {
+          note.textContent =
+            "mem=0 is the heaviest groom and crashes the browser on 14.02: " +
+            "the next run will use mem=2 automatically. Cycle back to auto " +
+            "for the defaults.";
+        } else {
+          note.textContent = explicit
+            ? "Next run uses ?mem=" + level + ". Cycle back to auto for the defaults."
+            : "Auto: heaviest on 14.00, light on 14.02, lighter after memory crashes.";
+        }
       }
     }
 

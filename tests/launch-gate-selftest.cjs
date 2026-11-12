@@ -96,13 +96,30 @@ assert.match(unknown.element("count").textContent, /not supported/);
   assert.equal(
     JSON.parse(page.store.get("jb-mem-level")).explicit, true);
 
-  // An explicit 0 is honoured on 14.02 (no &mem= in the URL).
+  // An explicit mem=0 is never run on 14.02: the heaviest groom
+  // out-of-memory-crashes the browser on the experimental route, so
+  // runUrl() converts it to the light groom (mem=2) and the selector
+  // note explains the conversion.
   const chosen = load("Mozilla/5.0 (PlayStation 4 14.02)");
-  chosen.store.set("jb-mem-level", JSON.stringify({ level: 0, explicit: true }));
-  chosen.element("mem-cycle").listeners.click(); // 0 -> 1
-  assert.match(chosen.element("mem-cycle").textContent, /mem1 balanced/);
+  chosen.element("mem-cycle").listeners.click(); // auto -> 0 (stored explicit)
+  assert.match(chosen.element("mem-cycle").textContent, /mem0 heaviest/);
+  assert.match(chosen.element("mem-note").textContent, /crashes the browser on 14\.02/);
   chosen.element("start").listeners.click();
-  assert.match(chosen.window.location.href, /&mem=1/);
+  assert.match(chosen.window.location.href, /&mem=2/);
+
+  // Cycling from a stored 0 still goes to 1 and is honoured as-is.
+  const cycled = load("Mozilla/5.0 (PlayStation 4 14.02)");
+  cycled.store.set("jb-mem-level", JSON.stringify({ level: 0, explicit: true }));
+  cycled.element("mem-cycle").listeners.click(); // 0 -> 1
+  assert.match(cycled.element("mem-cycle").textContent, /mem1 balanced/);
+  cycled.element("start").listeners.click();
+  assert.match(cycled.window.location.href, /&mem=1/);
+
+  // 14.00 is unchanged: an explicit mem=0 is honoured as-is.
+  const legacy = load("Mozilla/5.0 (PlayStation 4 14.00)");
+  legacy.store.set("jb-mem-level", JSON.stringify({ level: 0, explicit: true }));
+  legacy.element("start").listeners.click();
+  assert.doesNotMatch(legacy.window.location.href, /&mem=/);
 
   // The crash ladder's non-explicit record is still honoured as-is.
   const ladder = load("Mozilla/5.0 (PlayStation 4 14.02)");
