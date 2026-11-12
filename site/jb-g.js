@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402guard4";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402guard4";
-import { int64 } from "./int64.js?v=gh1402guard4";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402guard4";
+import { establishPrimitive } from "./core.js?v=gh1402mem6";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem6";
+import { int64 } from "./int64.js?v=gh1402mem6";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem6";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -48,6 +48,10 @@ function escalateMemLevel() {
     var level = raw && Number.isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
     var crashes = raw && Number.isFinite(raw.crashes) ? raw.crashes : 0;
     if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) { level = 0; crashes = 0; }
+    /* Escalate from the level that actually ran this page (the ?mem=
+       parameter), not just the stored one. */
+    var urlLevel = parseInt(params.get("mem") || "0", 10);
+    if (Number.isFinite(urlLevel) && urlLevel > level) level = urlLevel;
     /* Step two levels per kill: a console that OOMs at 130 MB should not
        burn four crashes to learn that it needs the ~15 MB groom. */
     level = Math.min(level + 2, 5);
@@ -1074,7 +1078,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402guard4");
+        const ag = await import("./afterglow-g.js?v=gh1402mem6");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,

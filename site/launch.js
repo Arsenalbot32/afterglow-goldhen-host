@@ -33,12 +33,19 @@
     var mem = "";
     try {
       var raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null");
-      if (raw && isFinite(raw.level) && raw.level > 0 && raw.level <= 5)
-        mem = "&mem=" + raw.level;
+      var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5
+        ? raw.level : 0;
+      /* 14.02 starts on a light groom by default: the heaviest profile
+         pins ~130 MB and this console's browser has already run out of
+         memory on it repeatedly.  Lighter profiles are also where the
+         placement failures cluster least.  14.00 keeps the proven
+         heaviest default.  A crash still escalates further (see below). */
+      if (level === 0 && detectedFirmware() === "14.02") level = 2;
+      if (level > 0) mem = "&mem=" + level;
     } catch (e) {}
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402guard4&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem6&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -200,6 +207,9 @@
       var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5 ? raw.level : 0;
       var crashes = raw && isFinite(raw.crashes) ? raw.crashes : 0;
       if (Date.now() - (raw && raw.ts || 0) > 30 * 60 * 1000) { level = 0; crashes = 0; }
+      /* escalate from the level that actually ran: 14.02 defaults to 2
+         even when nothing is stored yet */
+      if (level === 0 && detectedFirmware() === "14.02") level = 2;
       var next = Math.min(level + 2, 5);
       crashes += 1;
       try {
@@ -213,7 +223,8 @@
       if (count) count.textContent =
         crashes > 6
           ? "Out of memory even on the lightest profile (crash " + crashes +
-            "). Fully close the browser (Options) or restart the console, then reopen this page."
+            "). Close every other browser tab (Options button), fully quit the " +
+            "browser or restart the console, then reopen this page."
           : "Previous run ran out of memory -- retrying directly with the lighter heap profile mem=" + next + "...";
       if (crashes > 6) return false;
       window.setTimeout(function () {
