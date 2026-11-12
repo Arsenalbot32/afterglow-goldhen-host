@@ -8,7 +8,6 @@ const stateEl = document.getElementById("state");
 const lines = [];
 let passCount = 0,
   failCount = 0;
-let armedEver = false;
 const params = new URLSearchParams(location.search);
 
 /* The retry notice. Two things lead here: the chain throws, or it stalls
@@ -17,6 +16,11 @@ const params = new URLSearchParams(location.search);
    the commoner case, a stuck thread on a live page, the notice appears. */
 let lastMark = Date.now();
 let retryShown = false;
+/* Set the moment the kernel stage is armed. A failure before this point
+   touched nothing (no apm unit, no kernel byte), so reloading and re-running
+   is free. After it, the page never reloads itself -- the landing page holds
+   for an acknowledgement instead. */
+let kernelArmed = false;
 
 function showNotice(text) {
   try {
@@ -32,6 +36,23 @@ function showRetry() {
   if (retryShown) return;
   retryShown = true;
   showNotice("exploit failed - please retry (reopen browser)");
+  /* Out-of-memory kills the WebProcess outright and this never runs; it
+     covers the live-page failures. Go back to the landing page on its own
+     so the countdown re-arms the run without a single click. Capped in
+     sessionStorage so a systematic failure cannot loop forever; the cap
+     clears the moment the primitive succeeds. */
+  if (kernelArmed) return;
+  try {
+    var KEY = "jb-g-fail-reload";
+    var n = parseInt(sessionStorage.getItem(KEY) || "0", 10);
+    if (Number.isFinite(n) && n >= 0 && n < 3) {
+      sessionStorage.setItem(KEY, String(n + 1));
+      showNotice("reloading in 3 seconds (retry " + (n + 1) + " of 3)...");
+      setTimeout(function () {
+        try { location.replace("index.html"); } catch (e) {}
+      }, 3000);
+    }
+  } catch (e) {}
 }
 
 const WATCHDOG_MS = 45000;
@@ -230,9 +251,7 @@ function finishUI(ok) {
   if (m)
     m.textContent = ok
       ? "DONE"
-      : armedEver
-        ? "Restart your console"
-        : "Refresh the page and run again";
+      : "Quit and relaunch the browser to try again";
   document.body.className = ok ? "done" : "fail";
 }
 function mark(tag, detail) {
@@ -669,6 +688,7 @@ let allDone = false,
         "   (promotion off: the 137 MB stays pinned)",
     );
     mark("PRIMITIVE-OK", "");
+    try { sessionStorage.removeItem("jb-g-fail-reload"); } catch (e) {}
 
     const cell = p.leakval(Math.expm1);
     const nativeFn = p.read8(
@@ -1025,12 +1045,25 @@ let allDone = false,
           ag.probeAfterglow(agCtx);
           agOk = true;
         } else {
+          kernelArmed = true;
+          /* Persist the arming: the landing page holds the next run for an
+             acknowledgement only when the last one reached the kernel. */
+          try {
+            if (window.AfterglowBreadcrumb)
+              window.AfterglowBreadcrumb.checkpoint("kernel-armed", "afterglow chain starting");
+          } catch (e) {}
           const agResult = await ag.runAfterglow(agCtx);
           agOk = !!(agResult && agResult.payload === true);
           if (!agOk) throw new Error("GoldHEN payload thread did not start");
         }
         allDone = true;
         finishUI(agOk);
+        if (agOk) {
+          try {
+            if (window.AfterglowBreadcrumb)
+              window.AfterglowBreadcrumb.checkpoint("complete", "goldhen started");
+          } catch (e) {}
+        }
         try {
           history.replaceState(
             null,

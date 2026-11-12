@@ -76,7 +76,7 @@
     }
 
     if (params.get("afterglow") === "failed") {
-      stop("GoldHEN did not start. Cold boot the console before trying again.");
+      stop("GoldHEN did not start. Quit and relaunch the browser to try again.");
       return;
     }
 
@@ -154,7 +154,14 @@
       return;
     }
     var previous = diagnostics.latest();
-    if (previous && !diagnostics.isComplete(previous) && holdForPreviousRun(previous)) return;
+    /* Hold for an acknowledgement only when the last run reached the kernel
+       stage (breadcrumb "kernel-armed"); a crash before that -- an
+       out-of-memory kill in the WebKit primitive, say -- touched nothing,
+       so the countdown just starts and the run re-arms itself. */
+    var reachedKernel =
+      previous && !diagnostics.isComplete(previous) &&
+      previous.stage === "kernel-armed";
+    if (reachedKernel && holdForPreviousRun(previous)) return;
   }
   beginCountdown();
 })();
