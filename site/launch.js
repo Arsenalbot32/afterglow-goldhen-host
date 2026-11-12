@@ -32,11 +32,7 @@
   function launchGoldHEN() {
     if (launched) return;
     var firmware = detectedFirmware() || "unknown";
-    if (firmware === "14.02") {
-      stop("GoldHEN 14.02 is disabled after a hardware kernel panic. Do not retry this build.");
-      return;
-    }
-    if (firmware !== "14.00") {
+    if (firmware !== "14.00" && firmware !== "14.02") {
       stop("Firmware " + firmware + " is not supported by this release.");
       return;
     }
@@ -95,10 +91,13 @@
       return;
     }
 
-    if (firmware === "14.02") {
+    var experimental = firmware === "14.02";
+    if (experimental) {
       enableStorageTest(firmware);
-      stop("GoldHEN 14.02 is disabled after a hardware kernel panic. Do not retry this build.");
-      return;
+      if (count) count.textContent =
+        "EXPERIMENTAL 14.02 route: kernel chain proven on a retail dump, " +
+        "GoldHEN payload unverified on hardware. A freeze is recovered by a " +
+        "cold boot (power off 30 seconds).";
     }
 
     if (start) {
@@ -114,6 +113,7 @@
       }
       if (count) {
         count.textContent =
+          (experimental ? "EXPERIMENTAL 14.02 -- " : "") +
           "GoldHEN starts in " + remaining +
           (remaining === 1 ? " second..." : " seconds...");
       }

@@ -42,13 +42,17 @@ function load(userAgent) {
   return { window, element, ticks };
 }
 
-const blocked = load("Mozilla/5.0 (PlayStation 4 14.02)");
-assert.equal(blocked.element("start").style.display, "none");
-assert.match(blocked.element("count").textContent, /GoldHEN 14\.02 is disabled/);
-assert.equal(blocked.window.location.href, "");
-assert.equal(blocked.ticks.length, 0);
-assert.equal(blocked.element("start").listeners.click, undefined);
-assert.equal(typeof blocked.element("test-storage").listeners.click, "function");
+/* 14.02 is ENABLED again, behind an EXPERIMENTAL warning: the kernel chain
+   is proven on a retail dump and the guarded bootstrap refuses safely, so
+   the button must exist and the countdown must run. */
+const experimental = load("Mozilla/5.0 (PlayStation 4 14.02)");
+assert.notEqual(experimental.element("start").style.display, "none");
+assert.equal(typeof experimental.element("start").listeners.click, "function");
+assert.equal(experimental.ticks.length, 1);
+assert.match(experimental.element("count").textContent, /EXPERIMENTAL 14\.02/);
+assert.equal(typeof experimental.element("test-storage").listeners.click, "function");
+experimental.element("start").listeners.click();
+assert.match(experimental.window.location.href, /^launch\.html\?/);
 
 const supported = load("Mozilla/5.0 (PlayStation 4 14.00)");
 assert.equal(typeof supported.element("start").listeners.click, "function");

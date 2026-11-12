@@ -17,12 +17,22 @@ The project distinguishes between the existing 14.00 implementation and the expe
 
 | Firmware | Status |
 |---|---|
-| 14.00 | Existing GoldHEN implementation |
-| 14.02 | Experimental, disabled and unverified |
+| 14.00 | Existing GoldHEN implementation (hardware-proven, unchanged) |
+| 14.02 | Experimental — enabled behind a guarded bootstrap |
 
-The 14.02 launch path remains disabled.
+The 14.02 kernel exploit chain is proven on this firmware: the `kernel_1402.bin`
+reference dump was produced by this host's own `?dump=kernel` feature, which
+runs the full chain (leak, gadget scan, mapping walk, ring-0 bootstrap write,
+syscall-11 gate) to dump the kernel — so every stage up to and including the
+kernel writes works on 14.02.
 
-A reconstructed 14.02 candidate caused a hardware kernel panic during testing on November 11, 2026. No subsequent work has established a reliable or safe 14.02 launch.
+What is NOT proven on 14.02 is the GoldHEN payload itself: the first run of
+the reconstructed `goldhen-1402-experimental.bin` ended in a hardware kernel
+panic on November 11, 2026. The 14.02 route is therefore re-enabled with a
+guarded bootstrap (see below) that refuses and rolls back instead of writing
+into an unexpected kernel, plus a live `sysent[11]` read-out before anything
+is written. A panic or refusal is recovered by a cold boot (power off 30
+seconds).
 
 The 14.02 experimental artifacts must not be considered console-ready.
 
@@ -57,9 +67,17 @@ The available 14.02 reference artifacts have known limitations and cannot all be
 
 Previous investigations identified inconsistencies in supplied binary references and incomplete validation of the reconstructed candidate.
 
-The offline preflight and bootstrap prototypes are research tools only. They are not connected to an operational 14.02 launch path.
+The 14.02 route now embeds the generated guarded bootstrap
+(`tools/build-guarded-bootstrap-1402.cjs`, version `guarded-bootstrap-1402-v2`,
+1679 bytes) in `site/afterglow-g.js`: it derives the kernel base itself,
+refuses any site that is not exactly stock (or, on a re-run, exactly final),
+checks the teardown padding, brackets every write with `cli`/`CR0.WP` off,
+and rolls the kernel back if the read-back disagrees. Its return value is
+captured and every non-success status aborts the run before the payload
+stage. The 14.00 route is byte-for-byte untouched.
 
-No hardware validation or release certification is claimed.
+No hardware validation of the 14.02 payload or release certification is
+claimed; the guarded route limits damage, it does not certify safety.
 
 ## Safety and stability
 
@@ -67,7 +85,9 @@ A kernel panic can cause data loss or require a console restart.
 
 The previous 14.02 kernel panic is a significant warning and must not be treated as an acceptable validation result.
 
-The 14.02 launch remains disabled. No instructions or assurances for running the experimental candidate on physical hardware are provided.
+The 14.02 route is experimental. A refusal or kernel panic on 14.02 is
+recovered by a cold boot (power off 30 seconds). No assurance is provided
+that the experimental GoldHEN 14.02 payload will run.
 
 ## Development and contributions
 
