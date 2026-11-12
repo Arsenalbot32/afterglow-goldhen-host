@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402mem15";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem15";
-import { int64 } from "./int64.js?v=gh1402mem15";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem15";
+import { establishPrimitive } from "./core.js?v=gh1402mem16";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem16";
+import { int64 } from "./int64.js?v=gh1402mem16";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem16";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -393,7 +393,15 @@ let allDone = false,
   let closeFd = null;
   try {
     const { key, off } = offsetsFor(navigator.userAgent);
-    mark("BUILD", "jb=skipjb2 base=ef1670a");
+    /* Which asset generation is actually running -- the PS4 browser serves
+       stale modules from its cache, and a stale run looks exactly like a
+       failed fix. The version rides the module's own import URL. */
+    let assetV = "unknown";
+    try {
+      const mv = /[?&]v=([A-Za-z0-9]+)/.exec(import.meta.url);
+      if (mv) assetV = mv[1];
+    } catch (e) {}
+    mark("BUILD", "jb=skipjb2 v=" + assetV + " base=ef1670a");
     mark("FW", key || "(not a PS4 UA)");
     if (!off) {
       /* NONPS4-DEBUG */
@@ -1078,7 +1086,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402mem15");
+        const ag = await import("./afterglow-g.js?v=gh1402mem16");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,
