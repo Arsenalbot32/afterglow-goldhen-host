@@ -10,6 +10,12 @@ const code = fs.readFileSync(path.join(__dirname, "..", "site", "launch.js"), "u
 function load(userAgent) {
   const elements = new Map();
   const ticks = [];
+  const store = new Map();
+  const localStorage = {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k),
+  };
   function element(id) {
     if (!elements.has(id)) {
       elements.set(id, {
@@ -38,8 +44,10 @@ function load(userAgent) {
     document: { getElementById: element },
     navigator: { userAgent },
     URLSearchParams,
+    localStorage,
+    Date,
   }, { filename: "launch.js" });
-  return { window, element, ticks };
+  return { window, element, ticks, store };
 }
 
 /* 14.02 is ENABLED again, behind an EXPERIMENTAL warning: the kernel chain
@@ -64,5 +72,50 @@ assert.equal(unknown.ticks.length, 1);
 unknown.element("start").listeners.click();
 assert.equal(unknown.window.location.href, "");
 assert.match(unknown.element("count").textContent, /not supported/);
+
+/* Heap-groom selector: a console that keeps missing placement on the
+   default profile needs a way to try another geometry from the landing
+   page (editing the URL by hand would break the referrer guard). The
+   button cycles auto -> 0..5 -> auto, an explicit choice is honoured by
+   runUrl() even on 14.02 (which otherwise forces the light default),
+   and the crash-ladder's non-explicit records keep working. */
+{
+  const page = load("Mozilla/5.0 (PlayStation 4 14.02)");
+  const btn = page.element("mem-cycle");
+
+  assert.match(btn.textContent, /auto/);
+  assert.doesNotMatch(page.window.location.href, /&mem=/); // not launched yet
+
+  // Default on 14.02 is still the light groom (mem=2).
+  page.element("start").listeners.click();
+  assert.match(page.window.location.href, /&mem=2/);
+
+  // Cycle: auto -> 0 -> 1.
+  btn.listeners.click();
+  assert.match(btn.textContent, /mem0 heaviest/);
+  assert.equal(
+    JSON.parse(page.store.get("jb-mem-level")).explicit, true);
+
+  // An explicit 0 is honoured on 14.02 (no &mem= in the URL).
+  const chosen = load("Mozilla/5.0 (PlayStation 4 14.02)");
+  chosen.store.set("jb-mem-level", JSON.stringify({ level: 0, explicit: true }));
+  chosen.element("mem-cycle").listeners.click(); // 0 -> 1
+  assert.match(chosen.element("mem-cycle").textContent, /mem1 balanced/);
+  chosen.element("start").listeners.click();
+  assert.match(chosen.window.location.href, /&mem=1/);
+
+  // The crash ladder's non-explicit record is still honoured as-is.
+  const ladder = load("Mozilla/5.0 (PlayStation 4 14.02)");
+  ladder.store.set("jb-mem-level", JSON.stringify({ level: 3, ts: Date.now(), crashes: 1 }));
+  ladder.element("start").listeners.click();
+  assert.match(ladder.window.location.href, /&mem=3/);
+
+  // Cycling past mem5 returns to auto and clears the stored record.
+  const wrap = load("Mozilla/5.0 (PlayStation 4 14.02)");
+  wrap.store.set("jb-mem-level", JSON.stringify({ level: 5, explicit: true }));
+  wrap.element("mem-cycle").listeners.click();
+  assert.match(wrap.element("mem-cycle").textContent, /auto/);
+  assert.equal(wrap.store.has("jb-mem-level"), false);
+}
 
 console.log("launch gate self-test passed");

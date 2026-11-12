@@ -29,23 +29,44 @@
     if (start) start.style.display = "none";
   }
 
-  function runUrl() {
-    var mem = "";
+  var MEM_LABELS = [
+    "mem0 heaviest",
+    "mem1 balanced",
+    "mem2 low",
+    "mem3 very low",
+    "mem4 minimum",
+    "mem5 extreme",
+  ];
+
+  function storedMem() {
     try {
       var raw = JSON.parse(localStorage.getItem("jb-mem-level") || "null");
-      var level = raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5
-        ? raw.level : 0;
-      /* 14.02 starts on a light groom by default: the heaviest profile
-         pins ~130 MB and this console's browser has already run out of
-         memory on it repeatedly.  Lighter profiles are also where the
-         placement failures cluster least.  14.00 keeps the proven
-         heaviest default.  A crash still escalates further (see below). */
-      if (level === 0 && detectedFirmware() === "14.02") level = 2;
-      if (level > 0) mem = "&mem=" + level;
+      if (raw && isFinite(raw.level) && raw.level >= 0 && raw.level <= 5)
+        return raw;
     } catch (e) {}
+    return null;
+  }
+
+  /* Effective groom level for the next run. An explicit choice from the
+     landing-page selector is honoured as-is (a user who picks the heaviest
+     groom on 14.02 knows what they chose: the carrier no longer multiplies
+     the profile's cost). Without one, 14.02 still starts on the light
+     groom by default and the crash ladder below still stores its own
+     levels. */
+  function effectiveMemLevel() {
+    var raw = storedMem();
+    var level = raw ? raw.level : 0;
+    if ((!raw || !raw.explicit) && level === 0 &&
+        detectedFirmware() === "14.02") level = 2;
+    return level;
+  }
+
+  function runUrl() {
+    var level = effectiveMemLevel();
+    var mem = level > 0 ? "&mem=" + level : "";
     // This must be a normal navigation from index.html. jb-g.js checks the
     // same-origin referrer before it will arm the kernel stage.
-    return "launch.html?v=gh1402mem7&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
+    return "launch.html?v=gh1402mem8&log=1&afterglow=run&mode=goldhen&cb=" + Date.now() + mem;
   }
 
   function launchGoldHEN() {
@@ -83,6 +104,47 @@
       testResult.textContent =
         "PASS: marker " + armed.stage + " was written and read back. Refresh or reopen this page to prove it survived.";
     });
+  }
+
+  /* Heap-groom selector. placement-throw misses are a heap-lottery, and the
+     geometry depends on the groom sizes, so a console that keeps missing on
+     the default profile can try another. One button cycles auto -> 0..5 ->
+     auto; the choice is stored explicit and honoured by runUrl() above. */
+  function initMemSelector() {
+    var btn = document.getElementById("mem-cycle");
+    if (!btn) return;
+    var note = document.getElementById("mem-note");
+
+    function refresh() {
+      var raw = storedMem();
+      var explicit = raw && raw.explicit;
+      btn.textContent = explicit
+        ? "Heap groom: " + MEM_LABELS[raw.level] + " (chosen)"
+        : "Heap groom: auto";
+      if (note) {
+        note.textContent = explicit
+          ? "Next run uses ?mem=" + raw.level + ". Cycle back to auto for the defaults."
+          : "Auto: heaviest on 14.00, light on 14.02, lighter after memory crashes.";
+      }
+    }
+
+    btn.addEventListener("click", function () {
+      var raw = storedMem();
+      var current = raw && raw.explicit ? raw.level : -1;
+      var next = current >= 5 ? -1 : current + 1;
+      try {
+        if (next < 0) localStorage.removeItem("jb-mem-level");
+        else {
+          localStorage.setItem(
+            "jb-mem-level",
+            JSON.stringify({ level: next, explicit: true, ts: Date.now() }),
+          );
+        }
+      } catch (e) {}
+      refresh();
+    });
+
+    refresh();
   }
 
   function beginCountdown() {
@@ -169,6 +231,7 @@
      the heap profile down one level so the next run grooms less memory.
      Profiles live in core.js (?mem=1..5); level 0 is the heaviest. */
   var landingFirmware = detectedFirmware();
+  initMemSelector();
   if (landingFirmware === "14.02") {
     if (!diagnostics) {
       stop("Persistent diagnostics did not load. No kernel stage will run.");
