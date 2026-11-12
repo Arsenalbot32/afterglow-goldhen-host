@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=gh1402mem14";
-import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem14";
-import { int64 } from "./int64.js?v=gh1402mem14";
-import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem14";
+import { establishPrimitive } from "./core.js?v=gh1402mem15";
+import { installWindowP, pairStatus } from "./mem.js?v=gh1402mem15";
+import { int64 } from "./int64.js?v=gh1402mem15";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=gh1402mem15";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -476,7 +476,7 @@ let allDone = false,
         setTimeout(resolve, 0);
       });
 
-      const PRIMITIVE_LOUD = /FAIL|ERROR|THREW|RETRY|ABORT|PASS/i;
+      const PRIMITIVE_LOUD = /FAIL|ERROR|THREW|RETRY|ABORT|PASS|MISS|LIGHTEN/i;
 
       const carrier = await establishPrimitive({
         maxAttempts: ATTEMPTS,
@@ -711,7 +711,7 @@ let allDone = false,
     markAttemptStart();
     await new Promise((r) => setTimeout(r, 0));
 
-    const PRIMITIVE_LOUD = /FAIL|ERROR|THREW|RETRY|ABORT|PASS/i;
+    const PRIMITIVE_LOUD = /FAIL|ERROR|THREW|RETRY|ABORT|PASS|MISS|LIGHTEN/i;
     const carrier = await establishPrimitive({
       maxAttempts: ATTEMPTS,
       onEvent: (t, d, a) =>
@@ -1078,7 +1078,7 @@ let allDone = false,
          (afterglow=probe) fires no trigger and patches nothing, so a restored
          page may run that. */
       try {
-        const ag = await import("./afterglow-g.js?v=gh1402mem14");
+        const ag = await import("./afterglow-g.js?v=gh1402mem15");
         // Exactly what afterglow reaches for, counted rather than guessed.
         const agCtx = {
           p: p, callAddr: callAddr, bufAddr: bufAddr, errno: errno,

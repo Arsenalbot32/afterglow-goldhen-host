@@ -181,14 +181,34 @@ if (typeof _gOverride.drain === "number") {
   DRAIN_COUNT = HX_MEM.drain;
 }
 
-const DRAIN_SIZE = _g("drainsz", HX_MEM ? HX_MEM.drainsz : 0x10000);
-const SLAB_SIZE = _g("slab", HX_MEM ? HX_MEM.slab : 0x400000);
-const BUTTERFLY_HOLE_SIZE = _g("bfly", HX_MEM ? HX_MEM.bfly : 0x81000);
-const SEPARATOR_SIZE = _g("sep", HX_MEM ? HX_MEM.sep : 0x10000);
-const EARLY_HOLE_SIZE = _g("early", HX_MEM ? HX_MEM.early : 0x70000);
-const GUARD_SIZE = _g("guard", HX_MEM ? HX_MEM.guard : 0x90000);
-const PREDECESSOR_SIZE = _g("pred", HX_MEM ? HX_MEM.pred : 0x80000);
-const FINAL_HOLE_SIZE = _g("final", HX_MEM ? HX_MEM.final : 0x80000);
+let DRAIN_SIZE = _g("drainsz", HX_MEM ? HX_MEM.drainsz : 0x10000);
+let SLAB_SIZE = _g("slab", HX_MEM ? HX_MEM.slab : 0x400000);
+let BUTTERFLY_HOLE_SIZE = _g("bfly", HX_MEM ? HX_MEM.bfly : 0x81000);
+let SEPARATOR_SIZE = _g("sep", HX_MEM ? HX_MEM.sep : 0x10000);
+let EARLY_HOLE_SIZE = _g("early", HX_MEM ? HX_MEM.early : 0x70000);
+let GUARD_SIZE = _g("guard", HX_MEM ? HX_MEM.guard : 0x90000);
+let PREDECESSOR_SIZE = _g("pred", HX_MEM ? HX_MEM.pred : 0x80000);
+let FINAL_HOLE_SIZE = _g("final", HX_MEM ? HX_MEM.final : 0x80000);
+
+/* A placement-throw retry used to be an identical ticket: the same groom,
+   the same layout, the same throw, until the attempt ceiling. When the
+   carrier has grown to a big-draw regime (observed: 8.6M slots, 72 MB)
+   the heap left for the groom is thin, so each placement-throw retry
+   halves the groom toward the mem5-extreme floor -- a lighter groom is
+   a supported configuration (the mem profiles are exactly that) and a
+   different layout, which is a new ticket. Returns false at the floor. */
+function lightenGroom() {
+  let changed = false;
+  if (DRAIN_COUNT > 4) { DRAIN_COUNT = Math.max(4, DRAIN_COUNT >> 1); changed = true; }
+  if (DRAIN_SIZE > 0x4000) { DRAIN_SIZE >>= 1; changed = true; }
+  if (SLAB_SIZE > 0x10000) { SLAB_SIZE >>= 1; changed = true; }
+  if (BUTTERFLY_HOLE_SIZE > 0x10000) { BUTTERFLY_HOLE_SIZE >>= 1; changed = true; }
+  if (EARLY_HOLE_SIZE > 0x10000) { EARLY_HOLE_SIZE >>= 1; changed = true; }
+  if (GUARD_SIZE > 0x18000) { GUARD_SIZE >>= 1; changed = true; }
+  if (PREDECESSOR_SIZE > 0x10000) { PREDECESSOR_SIZE >>= 1; changed = true; }
+  if (FINAL_HOLE_SIZE > 0x10000) { FINAL_HOLE_SIZE >>= 1; changed = true; }
+  return changed;
+}
 
 // 150 ms of idling before the critical load is an invitation to the GC.
 const CAPTURE_DELAY_MS = _g("cap", 50);
@@ -611,7 +631,16 @@ function scheduleSafeRetry(reason) {
 
   retryScheduled = true;
   const nextAttempt = attemptNumber + 1;
-  emit("AUTO-RETRY-SCHEDULED", `reason=${reason}-next-attempt=${nextAttempt}`);
+  let detail = `reason=${reason}-next-attempt=${nextAttempt}`;
+  if (reason === "placement-throw" && compositionError) {
+    detail += `-err=${compositionError.name}:${String(compositionError.message).slice(0, 60)}`;
+  }
+  emit("AUTO-RETRY-SCHEDULED", detail);
+  if (reason === "placement-throw" && lightenGroom()) {
+    emit("GROOM-LIGHTENED",
+      `drain=${DRAIN_COUNT}x0x${DRAIN_SIZE.toString(16)}-slab=0x${SLAB_SIZE.toString(16)}` +
+      `-bfly=0x${BUTTERFLY_HOLE_SIZE.toString(16)}`);
+  }
   releaseAttemptAllocations();
   setTimeout(
     () => {
